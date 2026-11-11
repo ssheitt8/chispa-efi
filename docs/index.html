@@ -1,0 +1,2094 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#141A21">
+<link rel="icon" href="icons/icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="icons/icon-192.png">
+<title>Chispa EFI</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<meta name="description" content="Prototipo de app para afinar una ECU programable compatible con Speeduino: tablero en vivo, tabla VE y de avance en 2D y 3D, autoajuste y registro de datos.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<style>
+:root{
+  /* Layout: app shell. Status bar holds the tabs (they drop to a bottom bar on phones); one working column; table views split into grid + side controls on wide screens. */
+  --bg:#0D1116;
+  --surface:#141A21;
+  --surface-2:#1C242D;
+  --line:#2A3440;
+  --fg:#E6EBF0;
+  --muted:#8C99A7;
+  --accent:#F2A93B;
+  --accent-ink:#1C1305;
+  --ok:#45C281;
+  --warn:#F0913A;
+  --bad:#EF5B53;
+  --rich:#5DA9F6;
+  --dot:#FF4D4D;
+  --ring:#FFFFFF;
+  --cell-s:70%;
+  --cell-l:57%;
+  --cell-ink:#0A0E13;
+  --mesh:rgba(5,8,12,.55);
+  --font-display:"Chakra Petch","Bahnschrift","DIN Alternate",system-ui,sans-serif;
+  --font-body:"IBM Plex Sans",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  --font-mono:"IBM Plex Mono",ui-monospace,"Cascadia Mono",Consolas,monospace;
+  --r:12px;
+  color-scheme:dark;
+}
+@media (prefers-color-scheme: light){
+  :root:not([data-theme="dark"]){
+    --bg:#EEF1F4;--surface:#FFFFFF;--surface-2:#E7ECF1;--line:#D3DBE3;--fg:#121920;--muted:#596673;
+    --accent:#B26700;--accent-ink:#FFFFFF;--ok:#1B8A52;--warn:#BB5C0B;--bad:#C93A32;--rich:#1E6CC0;
+    --dot:#E02424;--ring:#FFFFFF;--cell-s:66%;--cell-l:67%;--cell-ink:#0A0E13;--mesh:rgba(20,26,34,.35);
+    color-scheme:light;
+  }
+}
+:root[data-theme="light"]{
+  --bg:#EEF1F4;--surface:#FFFFFF;--surface-2:#E7ECF1;--line:#D3DBE3;--fg:#121920;--muted:#596673;
+  --accent:#B26700;--accent-ink:#FFFFFF;--ok:#1B8A52;--warn:#BB5C0B;--bad:#C93A32;--rich:#1E6CC0;
+  --dot:#E02424;--ring:#FFFFFF;--cell-s:66%;--cell-l:67%;--cell-ink:#0A0E13;--mesh:rgba(20,26,34,.35);
+  color-scheme:light;
+}
+
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+html,body{min-height:100%}
+body{margin:0;background:var(--bg);color:var(--fg);font:15px/1.45 var(--font-body);-webkit-font-smoothing:antialiased;-webkit-tap-highlight-color:transparent}
+body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);z-index:40;background:var(--surface)}
+button,input{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+h1,h2,h3{font-family:var(--font-display);font-weight:600;margin:0;text-wrap:balance;letter-spacing:.01em}
+h2{font-size:22px}
+h3{font-size:16px}
+p{margin:0}
+.muted{color:var(--muted)}
+.num{font-variant-numeric:tabular-nums}
+
+/* ---------- top bar + tabs ---------- */
+.topbar{position:sticky;top:env(safe-area-inset-top,0px);z-index:30;display:flex;align-items:center;gap:12px;
+  padding-block:10px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));
+  background:var(--surface);border-bottom:1px solid var(--line)}
+.brand{display:flex;align-items:center;gap:9px;flex:none}
+.brand-mark{width:30px;height:30px;border-radius:8px;background:var(--accent);display:grid;place-items:center}
+.brand-mark svg{width:18px;height:18px;fill:var(--accent-ink)}
+.brand-name{font-family:var(--font-display);font-weight:700;font-size:19px;letter-spacing:.02em;line-height:1}
+.brand-name small{display:block;font-size:10px;font-weight:600;color:var(--muted);letter-spacing:.16em;margin-top:2px}
+.status{display:flex;align-items:center;gap:8px;min-width:0;flex:0 1 auto;justify-content:flex-start;background:none;border:1px solid var(--line);
+  border-radius:999px;padding:6px 12px;cursor:pointer;font-size:13px;color:var(--muted);max-width:280px}
+@media (min-width:940px){.status{flex:none}}
+@media (min-width:940px) and (max-width:1239px){.burn-text{display:none}.tab{padding:8px 9px}}
+@media (min-width:940px) and (max-width:1099px){.tab svg{display:none}}
+.status span:last-child{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.sdot{width:8px;height:8px;border-radius:50%;background:var(--muted);flex:none}
+.status[data-state="on"] .sdot{background:var(--ok);box-shadow:0 0 0 3px color-mix(in srgb,var(--ok) 25%,transparent)}
+.status[data-state="busy"] .sdot{background:var(--accent);animation:pulse 1s infinite}
+.status[data-state="on"]{color:var(--fg)}
+@keyframes pulse{50%{opacity:.3}}
+.burn{display:flex;align-items:center;gap:10px;margin-left:auto;flex:none}
+.burn-text{font-size:13px;color:var(--muted);white-space:nowrap}
+.burn.pending .burn-text{color:var(--accent)}
+.tabs{display:flex;gap:2px}
+.tab{display:flex;align-items:center;gap:7px;background:none;border:0;border-radius:9px;padding:8px 11px;color:var(--muted);cursor:pointer;font-weight:500;font-size:14px}
+.tab svg{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;flex:none}
+.tab:hover{color:var(--fg)}
+.tab[aria-current="page"]{color:var(--fg);background:var(--surface-2)}
+.tab[aria-current="page"] svg{stroke:var(--accent)}
+
+/* ---------- buttons, chips, switches ---------- */
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;min-height:40px;padding:8px 14px;border-radius:10px;
+  border:1px solid var(--line);background:var(--surface-2);color:var(--fg);font-weight:600;font-size:14px;cursor:pointer;touch-action:manipulation}
+.btn:hover:not(:disabled){border-color:var(--muted)}
+.btn:disabled{opacity:.45;cursor:not-allowed}
+.btn.primary{background:var(--accent);color:var(--accent-ink);border-color:transparent}
+.btn.primary:hover:not(:disabled){filter:brightness(1.08)}
+.btn.ghost{background:none}
+.btn.danger{color:var(--bad)}
+.btn-burn{font-family:var(--font-display);letter-spacing:.08em;text-transform:uppercase;min-height:36px;padding:6px 14px}
+.chip{display:inline-flex;align-items:center;gap:6px;border-radius:999px;padding:3px 10px;font-size:12px;font-weight:600;
+  background:var(--surface-2);color:var(--muted);border:1px solid var(--line);white-space:nowrap}
+.chip[data-kind="ok"]{color:var(--ok);border-color:color-mix(in srgb,var(--ok) 40%,transparent)}
+.chip[data-kind="warn"]{color:var(--warn);border-color:color-mix(in srgb,var(--warn) 40%,transparent)}
+.chip[data-kind="bad"]{color:var(--bad);border-color:color-mix(in srgb,var(--bad) 40%,transparent)}
+.chip[data-kind="rich"]{color:var(--rich);border-color:color-mix(in srgb,var(--rich) 40%,transparent)}
+.chip[data-kind="accent"]{color:var(--accent);border-color:color-mix(in srgb,var(--accent) 40%,transparent)}
+.switch{display:inline-flex;align-items:center;gap:9px;cursor:pointer;font-size:14px;user-select:none}
+.switch input{appearance:none;-webkit-appearance:none;width:38px;height:22px;border-radius:999px;background:var(--line);position:relative;margin:0;cursor:pointer;transition:background .15s;flex:none}
+.switch input::after{content:"";position:absolute;top:3px;left:3px;width:16px;height:16px;border-radius:50%;background:var(--fg);transition:transform .15s}
+.switch input:checked{background:var(--accent)}
+.switch input:checked::after{transform:translateX(16px);background:var(--accent-ink)}
+.switch input:disabled{opacity:.4}
+.seg{display:inline-flex;background:var(--surface-2);border:1px solid var(--line);border-radius:10px;padding:3px;gap:2px}
+.seg button{border:0;background:none;padding:5px 12px;border-radius:7px;font-weight:600;font-size:13px;color:var(--muted);cursor:pointer}
+.seg button.on{background:var(--surface);color:var(--fg);box-shadow:0 1px 2px rgba(0,0,0,.25)}
+
+/* ---------- layout ---------- */
+main{max-width:1180px;margin:0 auto;padding-block:18px 32px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+.view{display:flex;flex-direction:column;gap:16px}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:16px;min-width:0}
+.card-head{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-bottom:12px}
+.label{font-size:11px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
+
+/* ---------- dashboard ---------- */
+.dash-top{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:16px}
+.rpm-card{position:relative;display:flex;flex-direction:column;align-items:center;padding-bottom:12px}
+.rpm-card svg{width:100%;max-width:300px;height:auto;display:block}
+.g-track{fill:none;stroke:var(--surface-2);stroke-width:12;stroke-linecap:butt}
+.g-red{fill:none;stroke:var(--bad);stroke-width:12;opacity:.85}
+.g-val{fill:none;stroke:var(--accent);stroke-width:12;stroke-linecap:butt}
+.g-tick{stroke:var(--muted);stroke-width:1.5}
+.g-tick.minor{stroke:var(--line)}
+.g-lab{fill:var(--muted);font:600 12px var(--font-display);text-anchor:middle;dominant-baseline:middle}
+.gauge-wrap{position:relative;width:100%;max-width:300px}
+.rpm-read{position:absolute;left:0;right:0;top:38%;text-align:center;pointer-events:none}
+.rpm-read b{display:block;font:700 46px/1 var(--font-display);font-variant-numeric:tabular-nums;letter-spacing:.01em}
+.rpm-read span{font-size:12px;color:var(--muted);letter-spacing:.12em;text-transform:uppercase}
+.rpm-sub{display:flex;gap:8px;flex-wrap:wrap;justify-content:center;margin-top:-6px}
+.afr-card{display:flex;flex-direction:column;gap:14px}
+.afr-main{display:flex;align-items:flex-end;justify-content:space-between;gap:12px;flex-wrap:wrap}
+.afr-big{font:700 54px/1 var(--font-display);font-variant-numeric:tabular-nums}
+.afr-big small{font-size:16px;color:var(--muted);font-weight:600;margin-left:6px;letter-spacing:.06em}
+.afr-target{font-size:13px;color:var(--muted)}
+.afr-target b{color:var(--fg);font-family:var(--font-display);font-size:18px;font-variant-numeric:tabular-nums}
+.afr-scale{position:relative;height:34px;margin-top:4px}
+.afr-bar{position:absolute;left:0;right:0;top:10px;height:8px;border-radius:999px;
+  background:linear-gradient(90deg,var(--rich),color-mix(in srgb,var(--rich) 30%,var(--ok)) 35%,var(--ok) 47%,var(--warn) 70%,var(--bad))}
+.afr-tgt{position:absolute;top:4px;width:2px;height:20px;background:var(--fg);transform:translateX(-1px);transition:left .2s}
+.afr-mk{position:absolute;top:6px;width:16px;height:16px;border-radius:50%;background:var(--surface);border:3px solid var(--fg);transform:translateX(-8px);transition:left .12s linear}
+.afr-ticks{position:absolute;left:0;right:0;top:22px;display:flex;justify-content:space-between;font:500 11px var(--font-mono);color:var(--muted)}
+.afr-notes{display:flex;gap:8px;flex-wrap:wrap}
+.tiles{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+@media (min-width:760px){.tiles{grid-template-columns:repeat(4,minmax(0,1fr))}}
+.tile{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:12px 14px;display:flex;flex-direction:column;gap:6px;min-width:0}
+.tile-v{font:600 28px/1.05 var(--font-display);font-variant-numeric:tabular-nums;white-space:nowrap}
+.tile-v small{font:500 12px var(--font-body);color:var(--muted);margin-left:4px}
+.tile-bar{height:4px;border-radius:999px;background:var(--surface-2);overflow:hidden}
+.tile-bar i{display:block;height:100%;width:0;background:var(--muted);transition:width .15s linear}
+.tile.warn .tile-v{color:var(--warn)}
+.tile.warn .tile-bar i{background:var(--warn)}
+.chart-card canvas{width:100%;height:220px;display:block}
+.legend{display:flex;gap:14px;font-size:12px;color:var(--muted)}
+.legend i{display:inline-block;width:14px;height:3px;border-radius:2px;vertical-align:middle;margin-right:6px}
+
+/* ---------- simulator panel ---------- */
+.sim{display:flex;flex-direction:column;gap:14px}
+.sim-row{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
+.throttle{display:flex;justify-content:space-between;align-items:baseline;font-size:14px}
+.throttle output{font:600 20px var(--font-display);font-variant-numeric:tabular-nums}
+input[type="range"]{-webkit-appearance:none;appearance:none;width:100%;height:36px;background:none;margin:0;cursor:pointer;touch-action:pan-y}
+input[type="range"]::-webkit-slider-runnable-track{height:8px;border-radius:999px;background:linear-gradient(90deg,var(--accent) var(--p,0%),var(--surface-2) var(--p,0%))}
+input[type="range"]::-moz-range-track{height:8px;border-radius:999px;background:var(--surface-2)}
+input[type="range"]::-moz-range-progress{height:8px;border-radius:999px;background:var(--accent)}
+input[type="range"]::-webkit-slider-thumb{-webkit-appearance:none;width:26px;height:26px;border-radius:50%;background:var(--fg);border:4px solid var(--accent);margin-top:-9px}
+input[type="range"]::-moz-range-thumb{width:18px;height:18px;border-radius:50%;background:var(--fg);border:4px solid var(--accent)}
+.scn{display:flex;gap:8px;flex-wrap:wrap}
+.scn button{border:1px solid var(--line);background:var(--surface-2);border-radius:999px;padding:7px 13px;font-size:13px;font-weight:600;cursor:pointer;color:var(--muted)}
+.scn button.on{color:var(--accent-ink);background:var(--accent);border-color:transparent}
+.sim-note{font-size:13px;color:var(--muted)}
+
+/* ---------- table views ---------- */
+.tv{display:grid;grid-template-columns:minmax(0,1fr);gap:14px}
+.tv-head{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;flex-wrap:wrap}
+.tv-head p{font-size:13px;color:var(--muted);margin-top:2px}
+.tv-live{display:flex;align-items:center;gap:10px;flex-wrap:wrap;justify-content:space-between;background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:8px 12px}
+.tv-live-txt{display:flex;align-items:center;gap:8px;font:500 14px var(--font-mono);font-variant-numeric:tabular-nums;min-width:0}
+.tv-live-txt i{width:9px;height:9px;border-radius:50%;background:var(--dot);flex:none}
+.tv-live-txt .afr{font-weight:600}
+.afr.ok{color:var(--ok)}.afr.warn{color:var(--warn)}.afr.bad{color:var(--bad)}.afr.rich{color:var(--rich)}.afr.off{color:var(--muted)}
+.tv-main{display:flex;flex-direction:column;gap:12px;min-width:0}
+.tv-gridwrap{position:relative;min-width:0}
+.tv-grid{display:grid;grid-template-columns:30px repeat(16,minmax(0,1fr));gap:1px;touch-action:none;user-select:none;-webkit-user-select:none;border-radius:8px;outline-offset:3px}
+.cell{height:21px;display:flex;align-items:center;justify-content:center;font:500 10px/1 var(--font-mono);font-variant-numeric:tabular-nums;color:var(--cell-ink);position:relative;cursor:pointer;transition:background-color .25s}
+.cell.dirty::after{content:"";position:absolute;top:1px;right:1px;width:0;height:0;border-style:solid;border-width:0 5px 5px 0;border-color:transparent var(--cell-ink) transparent transparent;opacity:.7}
+.cell.near{box-shadow:inset 0 0 0 1.5px var(--ring)}
+.cell.sel{outline:2px solid var(--fg);outline-offset:-1px;z-index:2}
+.cell.tuned{animation:tuned .7s ease-out}
+@keyframes tuned{0%{filter:brightness(1.6)}100%{filter:none}}
+.ax{display:flex;align-items:center;justify-content:flex-end;padding-right:5px;font:500 10px/1 var(--font-mono);color:var(--muted);font-variant-numeric:tabular-nums;height:21px}
+.ax-x{justify-content:center;padding:0;height:22px;font-size:9.5px}
+.ax-corner{font-size:9px;letter-spacing:.04em;justify-content:flex-end;padding-right:5px}
+.tv-axis-note{display:flex;justify-content:space-between;font-size:12px;color:var(--muted);margin-top:4px;padding-left:30px}
+.tv-dot{position:absolute;left:0;top:0;width:13px;height:13px;border-radius:50%;background:var(--dot);border:2px solid var(--ring);box-shadow:0 0 0 2px rgba(0,0,0,.35);pointer-events:none;z-index:3;will-change:transform}
+.tv-3d{position:relative;border-radius:10px;background:var(--surface);border:1px solid var(--line);overflow:hidden}
+.tv-3d canvas{display:block;width:100%;height:340px;touch-action:none;cursor:grab}
+.tv-3d .hint{position:absolute;left:12px;bottom:10px;font-size:12px;color:var(--muted);pointer-events:none}
+.tv-side{display:flex;flex-direction:column;gap:14px;min-width:0}
+.tv-edit{display:flex;flex-direction:column;gap:12px}
+.tv-edit-head{display:flex;align-items:baseline;justify-content:space-between;gap:10px}
+.tv-sel{font:500 13px var(--font-mono);color:var(--muted);text-align:right}
+.tv-vals{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin:0}
+.tv-vals div{background:var(--surface-2);border-radius:9px;padding:8px 10px;min-width:0}
+.tv-vals dt{font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);font-weight:600}
+.tv-vals dd{margin:2px 0 0;font:600 20px var(--font-display);font-variant-numeric:tabular-nums;white-space:nowrap}
+.tv-btns{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px}
+.tv-btns.three{grid-template-columns:repeat(3,minmax(0,1fr))}
+.tv-btns .btn{padding:8px 6px;font-size:14px}
+.tv-set{display:flex;gap:8px}
+.tv-set input{flex:1;min-width:0;background:var(--surface-2);border:1px solid var(--line);border-radius:10px;padding:8px 12px;font:500 15px var(--font-mono)}
+.tv-help{font-size:12.5px;color:var(--muted)}
+@media (min-width:700px){
+  .cell,.ax{height:27px;font-size:12px}
+  .ax-x{height:26px;font-size:11px}
+  .tv-grid{grid-template-columns:40px repeat(16,minmax(0,1fr))}
+  .tv-axis-note{padding-left:40px}
+  .tv-3d canvas{height:440px}
+}
+@media (max-width:699px){.ax-x.odd{color:transparent}.tv-grid.dec .cell{font-size:8px;letter-spacing:-.04em}}
+@media (min-width:1020px){
+  .tv{grid-template-columns:minmax(0,1fr) 340px;grid-template-areas:"head head" "live live" "main side";align-items:start}
+  .tv-head{grid-area:head}.tv-live{grid-area:live}.tv-main{grid-area:main}.tv-side{grid-area:side}
+}
+
+/* ---------- mapa base ---------- */
+.fuel-switch{align-self:flex-start}
+.wiz{display:grid;grid-template-columns:minmax(0,1fr);gap:16px;align-items:start}
+@media (min-width:1020px){.wiz{grid-template-columns:minmax(0,1fr) 420px}}
+.wiz-form{display:flex;flex-direction:column;gap:22px}
+.wiz-form fieldset{border:0;margin:0;padding:0;display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:12px;min-width:0}
+.wiz-form legend{font:600 16px var(--font-display);padding:0;margin-bottom:10px}
+.fld{display:flex;flex-direction:column;gap:6px;font-size:13px;color:var(--muted);min-width:0}
+.fld .in{display:flex;align-items:center;gap:8px;background:var(--surface-2);border:1px solid var(--line);border-radius:10px;padding:0 12px;min-height:42px}
+.fld .in:focus-within{border-color:var(--accent)}
+.fld input,.fld select{flex:1;min-width:0;width:100%;background:transparent;border:0;color:var(--fg);font:500 15px var(--font-mono);padding:9px 0;outline:none}
+.fld select{font-family:var(--font-body);cursor:pointer}
+.fld select option{background:var(--surface);color:var(--fg)}
+.fld .u{font:500 13px var(--font-mono);color:var(--muted);white-space:nowrap}
+.fld .seg{align-self:flex-start}
+.wiz-res{display:flex;flex-direction:column;gap:14px}
+.wiz-res .info{margin:0}
+.wiz-warn{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:8px}
+.wiz-warn li{font-size:14px;padding:9px 12px;border-radius:9px;background:var(--surface-2);border-left:3px solid var(--muted)}
+.wiz-warn li[data-kind="bad"]{border-left-color:var(--bad)}
+.wiz-warn li[data-kind="warn"]{border-left-color:var(--warn)}
+.wiz-warn li[data-kind="ok"]{border-left-color:var(--ok)}
+.thumbs{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+.thumb{display:flex;flex-direction:column;gap:5px;font:500 12px var(--font-mono);color:var(--muted);min-width:0}
+.thumb b{color:var(--fg);font:600 13px var(--font-display)}
+.thumb canvas{width:100%;max-width:100%;aspect-ratio:1;height:auto;border-radius:6px;display:block;background:var(--surface-2)}
+.wiz-confirm{display:flex;flex-direction:column;gap:10px}
+
+/* ---------- datalog ---------- */
+.log-actions{display:flex;gap:8px;flex-wrap:wrap}
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px;margin:14px 0}
+.stats div{background:var(--surface-2);border-radius:9px;padding:8px 12px}
+.stats dt{font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);font-weight:600}
+.stats dd{margin:2px 0 0;font:600 20px var(--font-display);font-variant-numeric:tabular-nums}
+#logChart{width:100%;height:260px;display:block}
+.rec-dot{width:9px;height:9px;border-radius:50%;background:currentColor}
+
+/* ---------- connection ---------- */
+.conn-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:14px}
+.conn-opt{display:flex;flex-direction:column;gap:10px}
+.conn-opt p{font-size:14px;color:var(--muted);flex:1}
+.conn-opt.active{border-color:var(--accent)}
+.conn-opt .btn{align-self:flex-start}
+.note{font-size:14px;padding:12px 14px;border-radius:10px;background:var(--surface-2);border:1px solid var(--line)}
+.note[data-kind="bad"]{border-color:color-mix(in srgb,var(--bad) 45%,transparent)}
+.info{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin:0 0 14px}
+.info div{background:var(--surface-2);border-radius:9px;padding:8px 12px;min-width:0}
+.info dt{font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);font-weight:600}
+.info dd{margin:2px 0 0;font:500 15px var(--font-mono);overflow-wrap:anywhere}
+.comm{margin:0;max-height:240px;overflow:auto;background:var(--bg);border:1px solid var(--line);border-radius:9px;padding:10px 12px;font:12px/1.5 var(--font-mono);color:var(--muted);white-space:pre-wrap;overflow-wrap:anywhere}
+.comm .err{color:var(--bad)}.comm .ok{color:var(--ok)}
+.fine{font-size:13px;color:var(--muted);max-width:70ch}
+.verify-out{font-size:14px;color:var(--muted);min-width:0;flex:1 1 220px}
+.verify-out[data-kind="ok"]{color:var(--ok)}
+.verify-out[data-kind="bad"]{color:var(--bad)}
+
+.toast{position:fixed;left:50%;bottom:calc(24px + env(safe-area-inset-bottom,0px));transform:translate(-50%,12px);opacity:0;z-index:50;
+  background:var(--fg);color:var(--bg);padding:10px 16px;border-radius:10px;font-size:14px;font-weight:500;max-width:min(92vw,460px);text-align:center;transition:opacity .2s,transform .2s;pointer-events:none}
+.toast.show{opacity:1;transform:translate(-50%,0)}
+
+/* ---------- phone ---------- */
+@media (max-width:939px){
+  .tabs{position:fixed;left:0;right:0;bottom:0;z-index:30;display:grid;grid-template-columns:repeat(6,1fr);gap:0;background:var(--surface);border-top:1px solid var(--line);
+    padding:4px max(4px,env(safe-area-inset-right,0px)) calc(4px + env(safe-area-inset-bottom,0px)) max(4px,env(safe-area-inset-left,0px))}
+  .tab{flex-direction:column;gap:3px;font-size:11px;padding:6px 2px;border-radius:8px}
+  .tab[aria-current="page"]{background:none}
+  main{padding-bottom:calc(86px + env(safe-area-inset-bottom,0px))}
+  .toast{bottom:calc(80px + env(safe-area-inset-bottom,0px))}
+  .burn-text{display:none}
+  .status{flex:1 1 0;max-width:none}
+}
+@media (max-width:400px){
+  .brand-name small{display:none}
+  .topbar{gap:8px}
+  .status{padding:6px 10px;font-size:12px}
+}
+@media (prefers-reduced-motion: reduce){
+  *,*::before,*::after{animation:none!important;transition:none!important}
+}
+</style>
+</head>
+<body>
+
+<header class="topbar">
+  <div class="brand">
+    <div class="brand-mark" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M13.5 2 5 13.4h5.6L9.6 22 18.9 9.8h-5.7z"/></svg></div>
+    <div class="brand-name">Chispa<small>EFI</small></div>
+  </div>
+  <nav class="tabs" aria-label="Secciones">
+    <button class="tab" data-view="tablero"><svg viewBox="0 0 24 24"><path d="M4 16a8 8 0 1 1 16 0"/><path d="m12 16 4.2-5.2"/><path d="M4 20h16"/></svg>Tablero</button>
+    <button class="tab" data-view="combustible"><svg viewBox="0 0 24 24"><path d="M12 3c3.2 4.2 6 7.6 6 11a6 6 0 0 1-12 0c0-3.4 2.8-6.8 6-11z"/></svg>Inyección</button>
+    <button class="tab" data-view="encendido"><svg viewBox="0 0 24 24"><path d="M13.5 2 5 13.4h5.6L9.6 22 18.9 9.8h-5.7z"/></svg>Encendido</button>
+    <button class="tab" data-view="motor"><svg viewBox="0 0 24 24"><path d="M4 6h9M17 6h3M4 12h3M11 12h9M4 18h11M19 18h1"/><circle cx="15" cy="6" r="2"/><circle cx="9" cy="12" r="2"/><circle cx="17" cy="18" r="2"/></svg>Motor</button>
+    <button class="tab" data-view="registro"><svg viewBox="0 0 24 24"><path d="M3 19h18"/><path d="m4 15 4.5-5 3.5 3 5.5-7L20 9"/></svg>Registro</button>
+    <button class="tab" data-view="conexion"><svg viewBox="0 0 24 24"><path d="M9 3v4M15 3v4"/><path d="M7 7h10v4a5 5 0 0 1-10 0z"/><path d="M12 16v5"/></svg>Conexión</button>
+  </nav>
+  <button class="status" id="statusPill" data-state="off" title="Ver conexión"><span class="sdot"></span><span id="statusText">Sin conexión</span></button>
+  <div class="burn" id="burnWrap">
+    <span class="burn-text" id="burnText">Sin ECU</span>
+    <button class="btn primary btn-burn" id="burnBtn" disabled>Quemar</button>
+  </div>
+</header>
+
+<main>
+  <!-- TABLERO -->
+  <section class="view" id="v-tablero" data-view="tablero">
+    <div class="dash-top">
+      <div class="card rpm-card">
+        <div class="gauge-wrap">
+          <svg id="rpmGauge" viewBox="0 0 260 214" aria-hidden="true"></svg>
+          <div class="rpm-read"><b id="rpmVal" class="num">0</b><span>rpm</span></div>
+        </div>
+        <div class="rpm-sub" id="engineChips"></div>
+      </div>
+      <div class="card afr-card">
+        <div class="card-head" style="margin:0"><span class="label">Mezcla aire/combustible</span><span class="chip" id="afrChip">Sin lectura</span></div>
+        <div class="afr-main">
+          <div class="afr-big num" id="afrVal">—<small>AFR</small></div>
+          <div class="afr-target">Objetivo <b id="afrTgt">—</b></div>
+        </div>
+        <div class="afr-scale" aria-hidden="true">
+          <div class="afr-bar"></div>
+          <div class="afr-tgt" id="afrTgtMk" style="left:47%"></div>
+          <div class="afr-mk" id="afrMk" style="left:0%"></div>
+          <div class="afr-ticks"><span>10</span><span>12.5</span><span>15</span><span>17.5</span><span>20</span></div>
+        </div>
+        <p class="sim-note" id="afrHelp">Más alto que el objetivo es mezcla pobre: falta combustible en esa zona de la tabla VE. Más bajo es mezcla rica.</p>
+      </div>
+      <div class="sim-slot"></div>
+    </div>
+    <div class="tiles" id="tiles"></div>
+    <div class="card chart-card">
+      <div class="card-head"><h3>Últimos 30 segundos</h3>
+        <div class="legend"><span><i style="background:var(--accent)"></i>RPM</span><span><i style="background:var(--rich)"></i>AFR</span><span><i style="background:var(--muted)"></i>Objetivo</span></div>
+      </div>
+      <canvas id="liveChart"></canvas>
+    </div>
+  </section>
+
+  <!-- COMBUSTIBLE -->
+  <section class="view" id="v-combustible" data-view="combustible" hidden>
+    <div class="seg fuel-switch" role="group" aria-label="Tabla de combustible"><button class="on" data-fuel="ve">Tabla VE</button><button data-fuel="afr">AFR objetivo</button></div>
+    <div class="tv" id="tv-ve"></div>
+    <div class="tv" id="tv-afr" hidden></div>
+  </section>
+
+  <!-- MOTOR: asistente de mapa base -->
+  <section class="view" id="v-motor" data-view="motor" hidden>
+    <div class="tv-head"><div><h2>Mapa base</h2><p>Cargá los datos del motor y Chispa arma el punto de partida: inyector base, tabla VE, avance y AFR objetivo. Después se afina con la wideband.</p></div>
+      <button class="btn ghost" id="wizVirtual" type="button" hidden>Usar el motor de la ECU virtual</button></div>
+    <div class="wiz">
+      <form class="card wiz-form" id="wizForm" novalidate>
+        <fieldset>
+          <legend>Motor</legend>
+          <label class="fld" for="w-cc">Cilindrada total<span class="in"><input id="w-cc" type="number" min="50" max="10000" step="1" inputmode="numeric"><span class="u">cc</span></span></label>
+          <label class="fld" for="w-cyl">Cilindros<span class="in"><select id="w-cyl"><option>1</option><option>2</option><option>3</option><option>4</option><option>5</option><option>6</option><option>8</option></select></span></label>
+          <label class="fld" for="w-rpm">Régimen máximo<span class="in"><input id="w-rpm" type="number" min="2000" max="20000" step="100" inputmode="numeric"><span class="u">rpm</span></span></label>
+          <label class="fld" for="w-idle">Ralentí<span class="in"><input id="w-idle" type="number" min="400" max="2500" step="50" inputmode="numeric"><span class="u">rpm</span></span></label>
+          <label class="fld" for="w-prof">Preparación<span class="in"><select id="w-prof"><option value="calle">Original de calle</option><option value="leve">Preparado leve (árbol, escape)</option><option value="comp">Competición</option></select></span></label>
+          <div class="fld"><span>Aspiración</span><div class="seg" id="w-asp" role="group" aria-label="Aspiración"><button type="button" data-asp="na" class="on">Atmosférico</button><button type="button" data-asp="turbo">Turbo</button></div></div>
+          <label class="fld" for="w-boost" id="w-boost-f" hidden>Presión máxima de turbo<span class="in"><input id="w-boost" type="number" min="0.1" max="3" step="0.1" inputmode="decimal"><span class="u">bar</span></span></label>
+        </fieldset>
+        <fieldset>
+          <legend>Inyectores</legend>
+          <label class="fld" for="w-flow">Caudal de cada inyector<span class="in"><input id="w-flow" type="number" min="20" max="3000" step="1" inputmode="numeric"><span class="u">cc/min</span></span></label>
+          <label class="fld" for="w-ninj">Cantidad<span class="in"><select id="w-ninj"><option>1</option><option>2</option><option>3</option><option>4</option><option>5</option><option>6</option><option>8</option></select></span></label>
+          <label class="fld" for="w-prated">Presión a la que se midió el caudal<span class="in"><input id="w-prated" type="number" min="0.5" max="10" step="0.1" inputmode="decimal"><span class="u">bar</span></span></label>
+          <label class="fld" for="w-pwork">Presión de trabajo del regulador<span class="in"><input id="w-pwork" type="number" min="0.5" max="10" step="0.1" inputmode="decimal"><span class="u">bar</span></span></label>
+          <label class="fld" for="w-dead">Tiempo muerto<span class="in"><input id="w-dead" type="number" min="0" max="3" step="0.1" inputmode="decimal"><span class="u">ms</span></span></label>
+        </fieldset>
+        <fieldset>
+          <legend>Combustible</legend>
+          <label class="fld" for="w-fuel">Tipo<span class="in"><select id="w-fuel"><option value="gasolina">Gasolina</option><option value="e85">E85</option><option value="e100">Etanol E100</option></select></span></label>
+          <label class="fld" for="w-oct" id="w-oct-f">Octanaje (RON)<span class="in"><select id="w-oct"><option value="91">91 · regular</option><option value="95">95 · súper</option><option value="98">98</option></select></span></label>
+        </fieldset>
+      </form>
+      <div class="card wiz-res" aria-live="polite">
+        <h3>Resultado</h3>
+        <dl class="info" id="wizOut"></dl>
+        <ul class="wiz-warn" id="wizWarn"></ul>
+        <div class="thumbs">
+          <div class="thumb"><b>Tabla VE</b><canvas id="th-ve" width="160" height="160"></canvas><span id="th-ve-r"></span></div>
+          <div class="thumb"><b>Avance</b><canvas id="th-ign" width="160" height="160"></canvas><span id="th-ign-r"></span></div>
+          <div class="thumb"><b>AFR objetivo</b><canvas id="th-afr" width="160" height="160"></canvas><span id="th-afr-r"></span></div>
+        </div>
+        <div class="log-actions">
+          <button class="btn primary" id="wizApply" type="button">Aplicar a la ECU</button>
+          <button class="btn ghost" id="wizRestore" type="button" hidden>Volver al mapa anterior</button>
+        </div>
+        <div class="note wiz-confirm" id="wizConfirm" hidden>
+          <span>Esto reemplaza en la ECU las tablas VE, de avance y de AFR objetivo (con sus ejes), el inyector base, el tiempo muerto y el estequiométrico. Hasta que toques Quemar podés volver al mapa anterior.</span>
+          <div class="log-actions"><button class="btn primary" id="wizYes" type="button">Reemplazar</button><button class="btn ghost" id="wizNo" type="button">Cancelar</button></div>
+        </div>
+        <p class="sim-note" id="wizMsg">Es un punto de partida conservador, rico a plena carga y con poco avance. No reemplaza la afinación con wideband.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ENCENDIDO -->
+  <section class="view" id="v-encendido" data-view="encendido" hidden>
+    <div class="tv" id="tv-ign"></div>
+  </section>
+
+  <!-- REGISTRO -->
+  <section class="view" id="v-registro" data-view="registro" hidden>
+    <div class="card">
+      <div class="card-head"><h2>Registro de datos</h2><span class="chip" id="logState">Detenido</span></div>
+      <p class="muted" style="max-width:65ch">Grabá una pasada y revisala después: RPM, MAP, AFR, avance y temperaturas, 10 muestras por segundo. El CSV abre en Excel, MegaLogViewer o Google Sheets.</p>
+      <dl class="stats">
+        <div><dt>Duración</dt><dd id="stDur">0:00</dd></div>
+        <div><dt>Muestras</dt><dd id="stN">0</dd></div>
+        <div><dt>RPM máx.</dt><dd id="stRpm">—</dd></div>
+        <div><dt>AFR mín. / máx.</dt><dd id="stAfr">—</dd></div>
+        <div><dt>Motor máx.</dt><dd id="stClt">—</dd></div>
+      </dl>
+      <div class="log-actions">
+        <button class="btn primary" id="logBtn"><span class="rec-dot"></span><span>Grabar</span></button>
+        <button class="btn" id="logCopy" disabled>Copiar CSV</button>
+        <button class="btn" id="logDownload" disabled hidden>Descargar CSV</button>
+        <button class="btn ghost" id="logClear" disabled>Borrar</button>
+      </div>
+    </div>
+    <div class="card chart-card">
+      <div class="card-head"><h3>Grabación</h3>
+        <div class="legend"><span><i style="background:var(--accent)"></i>RPM</span><span><i style="background:var(--rich)"></i>AFR</span><span><i style="background:var(--muted)"></i>Objetivo</span></div>
+      </div>
+      <canvas id="logChart"></canvas>
+    </div>
+  </section>
+
+  <!-- CONEXIÓN -->
+  <section class="view" id="v-conexion" data-view="conexion" hidden>
+    <button class="btn primary" id="installBtn" type="button" hidden style="align-self:flex-start">Instalar Chispa como app</button>
+    <div class="conn-grid">
+      <article class="card conn-opt" data-mode="virtual">
+        <div class="card-head" style="margin:0"><h3>ECU virtual</h3><span class="chip" data-kind="accent">Sin hardware</span></div>
+        <p>Un motor simulado de 1.6 L y 4 cilindros, con inyectores de 315 cc/min, que responde con el mismo protocolo serial de Speeduino. Sirve para probar la app y practicar la afinación.</p>
+        <button class="btn" data-connect="virtual">Conectar</button>
+      </article>
+      <article class="card conn-opt" data-mode="usb">
+        <div class="card-head" style="margin:0"><h3>USB</h3><span class="chip">Web Serial</span></div>
+        <p>ECU con firmware Speeduino (Arduino Mega 2560, Teensy o STM32F407) a 115200 baudios. Funciona en Chrome o Edge de computadora. <a href="banco/" target="_blank" rel="noopener" style="color:var(--accent)">Cómo armar un banco de pruebas</a></p>
+        <button class="btn" data-connect="usb">Conectar</button>
+      </article>
+      <article class="card conn-opt" data-mode="ble">
+        <div class="card-head" style="margin:0"><h3>Bluetooth</h3><span class="chip">BLE UART</span></div>
+        <p>Puente Bluetooth en el segundo serial de la ECU: un ESP32 con el firmware puente-ble de Chispa (aparece como "Chispa-XXXX") o un módulo HM-10. Funciona en Chrome de Android y computadora. <a href="banco/#bluetooth" target="_blank" rel="noopener" style="color:var(--accent)">Cómo armar el puente</a></p>
+        <button class="btn" data-connect="ble">Conectar</button>
+      </article>
+    </div>
+    <p class="note" id="connNote" hidden></p>
+    <div class="card">
+      <div class="card-head"><h3>ECU conectada</h3>
+        <div class="log-actions"><button class="btn ghost" id="resetSim">Restaurar mapa base</button><button class="btn" id="disconnectBtn" disabled>Desconectar</button></div>
+      </div>
+      <dl class="info" id="ecuInfo"></dl>
+      <h3 style="margin-bottom:8px">Diagnóstico en vivo</h3>
+      <dl class="info" id="diag"></dl>
+      <div class="log-actions" style="align-items:center;margin-bottom:16px">
+        <button class="btn" id="verifyBtn" disabled>Verificar tablas</button>
+        <span class="verify-out" id="verifyOut">Compara por CRC32 las tablas de la ECU con las de Chispa.</span>
+      </div>
+      <h3 style="margin-bottom:8px">Comunicación</h3>
+      <pre class="comm" id="commLog" aria-live="off"></pre>
+    </div>
+    <p class="fine">Seguridad: con una ECU real, probá primero en banco con un simulador de cigüeñal. Una tabla mal cargada puede dejar el motor pobre y dañarlo. Antes de arrancar revisá fugas de combustible, la presión de la bomba y que el ventilador y la bomba corten al apagar.</p>
+  </section>
+</main>
+
+<div class="card sim" id="simPanel">
+  <div class="sim-row"><h3>Banco de pruebas</h3><span class="chip" data-kind="accent" id="simChip">ECU virtual</span></div>
+  <div class="sim-row">
+    <button class="btn primary" id="engineBtn">Arrancar motor</button>
+    <label class="switch"><input type="checkbox" id="autoTune"><span>Autoajuste VE</span></label>
+  </div>
+  <div>
+    <label class="throttle" for="tpsSlider"><span>Acelerador</span><output id="tpsOut" for="tpsSlider">0 %</output></label>
+    <input type="range" id="tpsSlider" min="0" max="100" step="1" value="0">
+  </div>
+  <div class="scn" role="group" aria-label="Escenarios de manejo">
+    <button data-scn="idle">Ralentí</button><button data-scn="cruise">Crucero</button><button data-scn="wot">A fondo</button><button data-scn="auto">Paseo automático</button>
+  </div>
+  <p class="sim-note" id="simNote">El autoajuste corrige la tabla VE con el AFR medido, como el VE Analyze de TunerStudio. Trabaja con el motor caliente y en régimen estable.</p>
+</div>
+
+<div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
+
+<script>
+(() => {
+'use strict';
+
+/* ============================== utilidades ============================== */
+const $ = (s, r = document) => r.querySelector(s);
+const $$ = (s, r = document) => Array.from(r.querySelectorAll(s));
+const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+const store = {
+  get(k, d) { try { const v = localStorage.getItem(k); return v == null ? d : JSON.parse(v); } catch (e) { return d; } },
+  set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} },
+  del(k) { try { localStorage.removeItem(k); } catch (e) {} }
+};
+const fmtRpm = v => v < 1000 ? String(Math.round(v)) : (v / 1000).toFixed(1).replace(/\.0$/, '') + 'k';
+const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+let inFrame = true;
+try { inFrame = window.self !== window.top; } catch (e) { inFrame = true; }
+
+/* ============================== CRC32 + tramas (msEnvelope de Speeduino) ============================== */
+const CRC_TABLE = (() => {
+  const t = new Uint32Array(256);
+  for (let n = 0; n < 256; n++) { let c = n; for (let k = 0; k < 8; k++) c = (c & 1) ? (0xEDB88320 ^ (c >>> 1)) : (c >>> 1); t[n] = c >>> 0; }
+  return t;
+})();
+function crc32(u8) {
+  let c = 0xFFFFFFFF;
+  for (let i = 0; i < u8.length; i++) c = CRC_TABLE[(c ^ u8[i]) & 0xFF] ^ (c >>> 8);
+  return (c ^ 0xFFFFFFFF) >>> 0;
+}
+// [largo uint16 BE][payload][CRC32 BE del payload]
+function frame(payload) {
+  const n = payload.length, out = new Uint8Array(n + 6), c = crc32(payload);
+  out[0] = n >> 8; out[1] = n & 255; out.set(payload, 2);
+  out[n + 2] = c >>> 24; out[n + 3] = (c >>> 16) & 255; out[n + 4] = (c >>> 8) & 255; out[n + 5] = c & 255;
+  return out;
+}
+// Lector incremental de tramas
+class FrameReader {
+  constructor() { this.buf = new Uint8Array(0); }
+  push(bytes) { const n = new Uint8Array(this.buf.length + bytes.length); n.set(this.buf); n.set(bytes, this.buf.length); this.buf = n; }
+  clear() { this.buf = new Uint8Array(0); }
+  next() { // -> {payload, ok} | null
+    const b = this.buf;
+    if (b.length < 2) return null;
+    const len = (b[0] << 8) | b[1];
+    if (len === 0 || len > 4096) { this.buf = b.slice(1); return { bad: true }; }
+    if (b.length < len + 6) return null;
+    const payload = b.slice(2, 2 + len);
+    const c = ((b[len + 2] << 24) | (b[len + 3] << 16) | (b[len + 4] << 8) | b[len + 5]) >>> 0;
+    this.buf = b.slice(len + 6);
+    return { payload, ok: c === crc32(payload) };
+  }
+}
+
+/* ============================== tablas 3D (16x16) ============================== */
+function axisPos(bins, v) {
+  const n = bins.length;
+  if (v <= bins[0]) return 0;
+  if (v >= bins[n - 1]) return n - 1;
+  for (let i = 0; i < n - 1; i++) {
+    if (v <= bins[i + 1]) { const span = bins[i + 1] - bins[i]; return i + (span > 0 ? (v - bins[i]) / span : 0); }
+  }
+  return n - 1;
+}
+function lookup16(vals, xb, yb, x, y) {
+  const fx = axisPos(xb, x), fy = axisPos(yb, y);
+  const x0 = Math.min(Math.floor(fx), 15), y0 = Math.min(Math.floor(fy), 15);
+  const x1 = Math.min(x0 + 1, 15), y1 = Math.min(y0 + 1, 15);
+  const tx = fx - x0, ty = fy - y0, v = (a, b) => vals[b * 16 + a];
+  const value = v(x0, y0) * (1 - tx) * (1 - ty) + v(x1, y0) * tx * (1 - ty) + v(x0, y1) * (1 - tx) * ty + v(x1, y1) * tx * ty;
+  return { fx, fy, x0, y0, x1, y1, tx, ty, value };
+}
+
+/* ============================== motor simulado ============================== */
+const RPM_BINS = [500, 800, 1100, 1400, 1700, 2000, 2400, 2800, 3200, 3700, 4200, 4700, 5200, 5800, 6400, 7000];
+const LOAD_BINS = [20, 26, 30, 36, 40, 46, 50, 56, 60, 66, 70, 76, 80, 86, 94, 100];
+// eficiencia volumétrica "real" del motor (la ECU no la conoce)
+function engineVE(rpm, map) {
+  const r = rpm / 1000, l = map / 100, shape = 1 - 0.035 * (r - 4.6) ** 2;
+  return (38 + 58 * l ** 0.85) * (0.78 + 0.22 * shape) + 4 * Math.sin(r * 1.3) * l;
+}
+// mapa base genérico: pobre en carga baja, rico en carga alta
+function baseVE(rpm, map) {
+  const r = rpm / 1000, l = map / 100, shape = 1 - 0.03 * (r - 5.2) ** 2;
+  return (30 + 68 * l) * (0.8 + 0.2 * shape);
+}
+function baseAdv(rpm, map) { return 8 + 26 * (1 - Math.exp(-rpm / 2200)) - 10 * (map / 100) ** 2; }
+function baseAfr(map) { return map <= 55 ? 14.7 : map >= 95 ? 12.8 : 14.7 - (map - 55) / 40 * 1.9; }
+// Datos "de fábrica" del motor simulado. Con estos valores el asistente de mapa base da reqFuel = 8.5 ms.
+const VENGINE = { cc: 1600, cyl: 4, flow: 315, pRated: 3, pWork: 3, dead: 1.0, fuel: 'gasolina', rpm: 7000, idle: 900 };
+const REQF_TRUE = 8.5, DEAD_TRUE = 1.0;
+
+const SIM_KEY = 'chispa.sim.flash.v2';
+const LIVE_LEN = 112;
+
+class VirtualECU {
+  constructor() {
+    this.reader = new FrameReader();
+    this.send = null;
+    this.resetToBase(false);
+    const saved = store.get(SIM_KEY, null), sizes = { p1: 128, p2: 288, p3: 288, p5: 288 };
+    if (saved && Object.keys(sizes).every(k => Array.isArray(saved[k]) && saved[k].length === sizes[k])) {
+      for (const k of Object.keys(sizes)) { const n = +k.slice(1); this.flash[n] = Uint8Array.from(saved[k]); this.ram[n] = this.flash[n].slice(); }
+    }
+    this.s = { running: false, crankT: 0, runT: 0, rpm: 0, map: 101, tps: 0, tpsTarget: 0, clt: 55, iat: 29, afr: 0, bat: 12.5,
+      adv: 0, ve: 0, pw: 0, wue: 100, afrT: 14.7, secl: 0, tAcc: 0, driver: null, drvNext: 0, time: 0 };
+    this.live = new Uint8Array(LIVE_LEN);
+    this._last = performance.now();
+    setInterval(() => this.tick(), 20);
+  }
+  resetToBase(clearSaved) {
+    const p1 = new Uint8Array(128);
+    p1[24] = 85;          // reqFuel 8.5 ms
+    p1[26] = 0 << 4;      // carga de encendido: MAP
+    p1[27] = 10;          // tiempo muerto del inyector 1.0 ms
+    p1[36] = 4 << 4;      // 4 cilindros
+    p1[37] = (4 << 4) | 0; // 4 inyectores · carga de combustible: MAP (speed density)
+    p1[50] = 147;         // estequiométrico 14.7
+    p1[70] = 0;           // "Incorporate AFR" apagado, como viene Speeduino
+    const p2 = new Uint8Array(288), p3 = new Uint8Array(288), p5 = new Uint8Array(288);
+    for (let y = 0; y < 16; y++) for (let x = 0; x < 16; x++) {
+      const rpm = RPM_BINS[x], map = LOAD_BINS[y], afr = baseAfr(map);
+      // con Incorporate AFR apagado, la tabla VE ya trae el enriquecimiento del AFR objetivo
+      p2[y * 16 + x] = clamp(Math.round(baseVE(rpm, map) * 14.7 / afr), 0, 255);
+      p3[y * 16 + x] = clamp(Math.round(baseAdv(rpm, map)) + 40, 0, 255);
+      p5[y * 16 + x] = clamp(Math.round(afr * 10), 0, 255);
+    }
+    for (let i = 0; i < 16; i++) {
+      p2[256 + i] = p3[256 + i] = p5[256 + i] = RPM_BINS[i] / 100;
+      p2[272 + i] = p3[272 + i] = p5[272 + i] = LOAD_BINS[i] / 2;
+    }
+    this.flash = { 1: p1, 2: p2, 3: p3, 5: p5 };
+    this.ram = { 1: p1.slice(), 2: p2.slice(), 3: p3.slice(), 5: p5.slice() };
+    if (clearSaved) store.del(SIM_KEY);
+  }
+  attach(send) { this.send = send; this.reader.clear(); }
+  detach() { this.send = null; }
+  receive(bytes) {
+    this.reader.push(bytes);
+    let f;
+    while ((f = this.reader.next())) {
+      if (f.bad) continue;
+      const resp = f.ok ? this.handle(f.payload) : [0x82];
+      const out = frame(Uint8Array.from(resp));
+      setTimeout(() => this.send && this.send(out), 3);
+    }
+  }
+  handle(p) {
+    const cmd = String.fromCharCode(p[0]);
+    const page = p[2], off = p[3] | (p[4] << 8), len = p[5] | (p[6] << 8);
+    switch (cmd) {
+      case 'Q': return [0, ...new TextEncoder().encode('speeduino 202501-virtual')];
+      case 'C': return [0, 255];
+      case 'd': {
+        const pg = this.ram[page];
+        if (!pg) return [0x84];
+        const c = crc32(pg);
+        return [0, c >>> 24, (c >>> 16) & 255, (c >>> 8) & 255, c & 255];
+      }
+      case 'p': {
+        const pg = this.ram[page];
+        if (!pg || off + len > pg.length) return [0x84];
+        return [0, ...pg.slice(off, off + len)];
+      }
+      case 'M': {
+        const pg = this.ram[page];
+        if (!pg || off + len > pg.length || p.length < 7 + len) return [0x84];
+        pg.set(p.slice(7, 7 + len), off);
+        return [0];
+      }
+      case 'b': case 'B': {
+        if (!this.ram[page]) return [0x84];
+        this.flash[page] = this.ram[page].slice();
+        store.set(SIM_KEY, { p1: Array.from(this.flash[1]), p2: Array.from(this.flash[2]), p3: Array.from(this.flash[3]), p5: Array.from(this.flash[5]) });
+        return [0x04];
+      }
+      case 'r': {
+        if (p[2] !== 0x30) return [0x83];
+        const o = p[3] | (p[4] << 8), l = p[5] | (p[6] << 8);
+        const out = new Uint8Array(l);
+        out.set(this.live.slice(o, Math.min(o + l, LIVE_LEN)));
+        return [0, ...out];
+      }
+      default: return [0x83];
+    }
+  }
+  lookup(page, rpm, load) {
+    const pg = this.ram[page], xb = [], yb = [];
+    for (let i = 0; i < 16; i++) { xb.push(pg[256 + i] * 100); yb.push(pg[272 + i] * 2); }
+    return lookup16(pg, xb, yb, rpm, load).value;
+  }
+  start() { const s = this.s; if (s.running || s.crankT > 0) return; s.crankT = 0.9; s.runT = 0; }
+  stop() { const s = this.s; s.running = false; s.crankT = 0; s.driver = null; }
+  tick() {
+    const now = performance.now();
+    const dt = Math.min((now - this._last) / 1000, 0.1);
+    this._last = now;
+    this.step(dt);
+    this.buildLive();
+  }
+  step(dt) {
+    const s = this.s, baro = 101, k = tau => 1 - Math.exp(-dt / tau);
+    s.time += dt; s.tAcc += dt;
+    if (s.tAcc >= 1) { s.tAcc -= 1; s.secl = (s.secl + 1) & 255; }
+    if (s.driver === 'auto' && s.running && s.time >= s.drvNext) {
+      const opts = [0, 0, 4, 7, 10, 14, 18, 24, 32, 45, 60, 80, 100];
+      s.tpsTarget = opts[Math.floor(Math.random() * opts.length)];
+      s.drvNext = s.time + 2.5 + Math.random() * 3;
+    }
+    s.tps += (s.tpsTarget - s.tps) * k(0.08);
+    if (s.crankT > 0) {
+      s.crankT -= dt;
+      s.rpm += (260 - s.rpm) * k(0.15) + (Math.random() - 0.5) * 20;
+      if (s.crankT <= 0) { s.running = true; s.runT = 0; }
+    } else if (!s.running) {
+      s.rpm *= Math.exp(-dt / 0.25); if (s.rpm < 20) s.rpm = 0;
+    }
+    const a = s.tps / 100, spinning = s.rpm > 50;
+    const eff = 1 - Math.exp(-(a * 6 + 0.012) / (0.4 + s.rpm / 4000));
+    const mapSS = spinning ? 22 + (baro - 22) * eff : baro;
+    s.map += (mapSS - s.map) * k(0.07);
+    const ve = this.lookup(2, s.rpm, s.map);
+    const adv = this.lookup(3, s.rpm, s.map) - 40;
+    const afrT = this.lookup(5, s.rpm, s.map) / 10;
+    s.wue = s.clt < 70 ? Math.round(100 + (70 - s.clt) * 0.6) : 100;
+    const engaged = s.running || s.crankT > 0;
+    // Igual que Speeduino: pulso del ciclo completo = reqFuel × VE × MAP (× estequiométrico/objetivo si "Incorporate AFR" está prendido)
+    const p1 = this.ram[1], reqFuel = p1[24] / 10, injOpen = p1[27] / 10, stoich = p1[50] / 10 || 14.7, incAfr = (p1[70] & 0x80) !== 0;
+    const pwCycle = engaged ? reqFuel * (ve / 100) * (s.map / 100) * (incAfr ? stoich / Math.max(afrT, 5) : 1) * (s.wue / 100) : 0;
+    s.pw = engaged ? pwCycle / 2 + injOpen : 0;   // dos inyecciones por ciclo (semi-secuencial)
+    if (s.running) {
+      s.runT += dt;
+      const trueVE = engineVE(s.rpm, s.map);
+      // tiempo que el inyector real necesita abierto para mezcla estequiométrica vs. el que abre de verdad
+      const tNeed = REQF_TRUE * (trueVE / 100) * (s.map / 100), tOpen = pwCycle + 2 * (injOpen - DEAD_TRUE);
+      const afrNow = clamp(tOpen > 0.05 ? 14.7 * tNeed / tOpen : 22, 8, 22);
+      s.afr += (afrNow - s.afr) * k(0.18);
+      const combust = Math.exp(-(((s.afr - 13.1) / 3.2) ** 2));
+      const advEff = Math.exp(-(((adv - (baseAdv(s.rpm, s.map) + 2)) / 18) ** 2));
+      let rpmT = a < 0.025 ? 900 + (s.clt < 60 ? 250 : 0) : 900 + 5700 * a ** 1.15;
+      rpmT *= 0.7 + 0.3 * combust * advEff;
+      if (s.afr > 18.5 || s.afr < 8.5) rpmT *= 0.85;
+      const tau = rpmT > s.rpm ? 0.55 + a * 0.3 : 0.9;
+      s.rpm += (rpmT - s.rpm) * k(tau) + (Math.random() - 0.5) * (s.rpm < 1200 ? 16 : 10) * (1 + 3 * (1 - combust));
+      if (s.rpm > 7000) s.rpm = 6900;
+      if (s.runT > 1.5 && s.rpm < 350) { s.running = false; s.driver = null; }
+      s.clt += (89 - s.clt) * dt / 40;
+      s.bat += (13.9 + (Math.random() - 0.5) * 0.08 - s.bat) * k(0.5);
+    } else {
+      s.afr = 0;
+      s.clt += (25 - s.clt) * dt / 900;
+      s.bat += (12.5 - s.bat) * k(1.5);
+    }
+    s.iat += ((28 + 6 * (1 - a)) - s.iat) * dt / 20;
+    s.ve = engaged ? ve : 0; s.adv = engaged ? adv : 0; s.afrT = afrT;
+  }
+  buildLive() {
+    const s = this.s, b = this.live;
+    const u16 = (o, v) => { v = clamp(Math.round(v), 0, 65535); b[o] = v & 255; b[o + 1] = v >> 8; };
+    b.fill(0);
+    b[0] = s.secl;
+    b[2] = (s.running ? 1 : 0) | (s.crankT > 0 ? 2 : 0) | (s.wue > 100 ? 8 : 0);
+    u16(4, s.map);
+    b[6] = clamp(Math.round(s.iat) + 40, 0, 255);
+    b[7] = clamp(Math.round(s.clt) + 40, 0, 255);
+    b[8] = 100;
+    b[9] = clamp(Math.round(s.bat * 10), 0, 255);
+    b[10] = s.running ? clamp(Math.round(s.afr * 10), 0, 255) : 0;
+    b[11] = 100; b[12] = 100;
+    b[13] = clamp(s.wue, 0, 255);
+    u16(14, s.rpm > 50 ? s.rpm : 0);
+    u16(17, s.wue);
+    b[19] = clamp(Math.round(s.ve), 0, 255);
+    b[21] = clamp(Math.round(s.afrT * 10), 0, 255);
+    const adv = Math.round(s.adv); b[24] = adv < 0 ? 256 + adv : adv;
+    b[25] = clamp(Math.round(s.tps * 2), 0, 255);
+    u16(76, s.pw * 1000);
+    u16(90, (s.running || s.crankT > 0) ? 3000 : 0);
+    b[32] = (s.running || s.crankT > 0.4) ? 0x80 : 0;   // bit 7 = sincronía completa
+    b[102] = b[19];
+  }
+}
+
+/* ============================== transportes ============================== */
+class LoopbackTransport {
+  constructor(ecu) { this.ecu = ecu; this.kind = 'virtual'; this.onData = null; this.onError = null; }
+  async open() { this.ecu.attach(bytes => this.onData && this.onData(bytes)); }
+  async write(u8) { this.ecu.receive(u8); }
+  async close() { this.ecu.detach(); }
+}
+class SerialTransport {
+  constructor() { this.kind = 'usb'; this.onData = null; this.onError = null; }
+  async open() {
+    this.port = await navigator.serial.requestPort();
+    await this.port.open({ baudRate: 115200 });
+    this.writer = this.port.writable.getWriter();
+    this.reading = true;
+    this._loop();
+  }
+  async _loop() {
+    while (this.reading && this.port && this.port.readable) {
+      this.reader = this.port.readable.getReader();
+      try {
+        for (;;) { const { value, done } = await this.reader.read(); if (done) break; if (value && this.onData) this.onData(value); }
+      } catch (e) { if (this.reading && this.onError) this.onError(e); break; }
+      finally { try { this.reader.releaseLock(); } catch (e) {} }
+    }
+  }
+  async write(u8) { await this.writer.write(u8); }
+  async close() {
+    this.reading = false;
+    try { await this.reader?.cancel(); } catch (e) {}
+    try { this.writer?.releaseLock(); } catch (e) {}
+    try { await this.port?.close(); } catch (e) {}
+  }
+}
+const NUS = { svc: '6e400001-b5a3-f393-e0a9-e50e24dcca9e', rx: '6e400002-b5a3-f393-e0a9-e50e24dcca9e', tx: '6e400003-b5a3-f393-e0a9-e50e24dcca9e' };
+class BleTransport {
+  constructor() { this.kind = 'ble'; this.onData = null; this.onError = null; }
+  async open() {
+    // Muestra solo puentes Chispa (ESP32), otros puentes Nordic UART y módulos HM-10
+    this.device = await navigator.bluetooth.requestDevice({
+      filters: [{ namePrefix: 'Chispa' }, { services: [NUS.svc] }, { services: [0xffe0] }],
+      optionalServices: [NUS.svc, 0xffe0]
+    });
+    this.device.addEventListener('gattserverdisconnected', () => { if (!this.closing && this.onError) this.onError(new Error('Se cortó el Bluetooth')); });
+    const server = await this.device.gatt.connect();
+    try {
+      const svc = await server.getPrimaryService(NUS.svc);
+      this.rxChar = await svc.getCharacteristic(NUS.rx);
+      this.txChar = await svc.getCharacteristic(NUS.tx);
+    } catch (e) {
+      const svc = await server.getPrimaryService(0xffe0);
+      this.rxChar = this.txChar = await svc.getCharacteristic(0xffe1);
+    }
+    await this.txChar.startNotifications();
+    this.txChar.addEventListener('characteristicvaluechanged', e => {
+      const dv = e.target.value;
+      if (this.onData) this.onData(new Uint8Array(dv.buffer.slice(dv.byteOffset, dv.byteOffset + dv.byteLength)));
+    });
+  }
+  async write(u8) {
+    for (let i = 0; i < u8.length; i += 20) {
+      const chunk = u8.slice(i, i + 20);
+      if (this.rxChar.properties.writeWithoutResponse) await this.rxChar.writeValueWithoutResponse(chunk);
+      else await this.rxChar.writeValue(chunk);
+    }
+  }
+  async close() { this.closing = true; try { this.device?.gatt?.disconnect(); } catch (e) {} }
+}
+
+/* ============================== cliente Speeduino ============================== */
+class EcuError extends Error {}
+const RC_TEXT = { 0x80: 'tiempo agotado', 0x82: 'CRC incorrecto', 0x83: 'comando desconocido', 0x84: 'rango inválido', 0x85: 'ECU ocupada' };
+class SpeeduinoClient {
+  constructor(transport, log) {
+    this.t = transport; this.log = log || (() => {});
+    this.reader = new FrameReader(); this.waiter = null; this.queue = Promise.resolve();
+    transport.onData = b => { this.reader.push(b); this._check(); };
+  }
+  _check() {
+    if (!this.waiter) return;
+    const f = this.reader.next();
+    if (!f) return;
+    if (f.bad) { this._check(); return; }
+    const w = this.waiter; this.waiter = null; clearTimeout(w.timer);
+    if (!f.ok) w.reject(new EcuError('La respuesta llegó con CRC incorrecto'));
+    else if (f.payload[0] >= 0x80) w.reject(new EcuError('La ECU respondió: ' + (RC_TEXT[f.payload[0]] || 'error 0x' + f.payload[0].toString(16))));
+    else w.resolve(f.payload);
+  }
+  request(payload, timeout = 1500) {
+    const run = () => new Promise((resolve, reject) => {
+      this.reader.clear();
+      const timer = setTimeout(() => { this.waiter = null; this.reader.clear(); reject(new EcuError('La ECU no respondió a tiempo')); }, timeout);
+      this.waiter = { resolve, reject, timer };
+      this.t.write(frame(Uint8Array.from(payload))).catch(e => { clearTimeout(timer); this.waiter = null; reject(e); });
+    });
+    const p = this.queue.then(run, run);
+    this.queue = p.catch(() => {});
+    return p;
+  }
+  async signature() { const r = await this.request([0x51]); return new TextDecoder().decode(r.slice(1)).replace(/\0/g, '').trim(); }
+  async readPage(page, offset, length) {
+    const out = new Uint8Array(length);
+    for (let done = 0; done < length;) {
+      const n = Math.min(96, length - done), o = offset + done;
+      const r = await this.request([0x70, 0, page, o & 255, o >> 8, n & 255, n >> 8]);
+      out.set(r.slice(1, 1 + n), done); done += n;
+    }
+    this.log(`→ leer página ${page} (${length} bytes)`);
+    return out;
+  }
+  async writePage(page, offset, bytes) {
+    for (let done = 0; done < bytes.length;) {
+      const n = Math.min(64, bytes.length - done), o = offset + done;
+      await this.request([0x4D, 0, page, o & 255, o >> 8, n & 255, n >> 8, ...bytes.slice(done, done + n)]);
+      done += n;
+    }
+  }
+  async burn(page) { await this.request([0x62, 0, page], 3000); this.log(`→ quemar página ${page} en la memoria de la ECU`, 'ok'); }
+  async pageCRC(page) { const r = await this.request([0x64, 0, page]); return ((r[1] << 24) | (r[2] << 16) | (r[3] << 8) | r[4]) >>> 0; }
+  async realtime(offset = 0, length = LIVE_LEN) {
+    const r = await this.request([0x72, 0, 0x30, offset & 255, offset >> 8, length & 255, length >> 8], 800);
+    return r.slice(1);
+  }
+}
+function decodeLive(d) {
+  const u16 = o => d[o] | (d[o + 1] << 8), s8 = o => d[o] > 127 ? d[o] - 256 : d[o];
+  return {
+    running: (d[2] & 1) === 1, crank: (d[2] & 2) === 2, map: u16(4), iat: d[6] - 40, clt: d[7] - 40, bat: d[9] / 10,
+    afr: d[10] / 10, wue: d[13], rpm: u16(14), afrTarget: d[21] / 10, adv: s8(24), tps: d[25] / 2,
+    pw: u16(76) / 1000, ve: d[102] || d[19], secl: d[0], syncLoss: d[3],
+    sync: (d[32] & 0x80) !== 0, halfSync: (d[84] & 0x10) !== 0
+  };
+}
+
+/* ============================== modelo de tablas ============================== */
+const TABLE_CFG = {
+  ve: { key: 've', page: 2, title: 'Tabla VE', subtitle: 'Combustible · página 2 · % de eficiencia volumétrica', unit: '%', translate: 0, min: 0, max: 255,
+    steps: [['−', v => v - 1], ['−2 %', v => v * 0.98], ['+2 %', v => v * 1.02], ['+', v => v + 1]],
+    diff: (n, b) => b ? (n - b) / b * 100 : 0, diffFmt: d => (d > 0 ? '+' : '') + d.toFixed(1) + ' %', valFmt: v => v.toFixed(0) + ' %' },
+  ign: { key: 'ign', page: 3, title: 'Tabla de avance', subtitle: 'Encendido · página 3 · grados antes del punto muerto superior', unit: '°', translate: -40, min: -40, max: 70,
+    steps: [['−2°', v => v - 2], ['−1°', v => v - 1], ['+1°', v => v + 1], ['+2°', v => v + 2]],
+    diff: (n, b) => n - b, diffFmt: d => (d > 0 ? '+' : '') + d.toFixed(1) + '°', valFmt: v => v.toFixed(0) + '°' },
+  afr: { key: 'afr', page: 5, title: 'AFR objetivo', subtitle: 'Combustible · página 5 · mezcla que se busca en cada zona', unit: '', translate: 0, min: 70, max: 255, div: 10,
+    steps: [['−0.5', v => v - 5], ['−0.1', v => v - 1], ['+0.1', v => v + 1], ['+0.5', v => v + 5]],
+    diff: (n, b) => (n - b) / 10, diffFmt: d => (d > 0 ? '+' : '') + d.toFixed(1), valFmt: v => (v / 10).toFixed(1), cellFmt: v => (v / 10).toFixed(1) }
+};
+const TABLE_KEYS = ['ve', 'ign', 'afr'];
+const pendingWrites = () => TABLE_KEYS.some(k => App.pending[k].size);
+class Table {
+  constructor(cfg) {
+    Object.assign(this, cfg);
+    this.values = new Int16Array(256); this.burned = new Int16Array(256);
+    this.x = RPM_BINS.slice(); this.y = LOAD_BINS.slice(); this.loadUnit = 'kPa'; this.loaded = false; this.rev = 0;
+  }
+  loadPage(bytes, loadScale, loadUnit) {
+    for (let i = 0; i < 256; i++) this.values[i] = bytes[i] + this.translate;
+    this.burned.set(this.values);
+    for (let i = 0; i < 16; i++) { this.x[i] = bytes[256 + i] * 100; this.y[i] = +(bytes[272 + i] * loadScale).toFixed(1); }
+    this.loadUnit = loadUnit; this.loadScale = loadScale; this.loaded = true; this.rev++;
+  }
+  toPage() { // la página tal cual la guarda la ECU (para comparar por CRC)
+    const b = new Uint8Array(288);
+    for (let i = 0; i < 256; i++) b[i] = this.values[i] - this.translate;
+    for (let i = 0; i < 16; i++) { b[256 + i] = Math.round(this.x[i] / 100); b[272 + i] = Math.round(this.y[i] / this.loadScale); }
+    return b;
+  }
+  dirtyCount() { let n = 0; for (let i = 0; i < 256; i++) if (this.values[i] !== this.burned[i]) n++; return n; }
+}
+
+/* ============================== estado de la app ============================== */
+const VECU = new VirtualECU();
+const App = {
+  view: 'tablero', mode: null, client: null, transport: null, polling: false, info: null, live: null, liveAt: 0,
+  rate: 0, cnt: 0, errs: 0, errTotal: 0, resets: 0, lastSecl: null,
+  tables: { ve: new Table(TABLE_CFG.ve), ign: new Table(TABLE_CFG.ign), afr: new Table(TABLE_CFG.afr) },
+  pending: { ve: new Set(), ign: new Set(), afr: new Set() }, undo: { ve: [], ign: [], afr: [] }, extraBurn: new Set(),
+  fuelView: 've', wizBackup: null, views: {}, hist: [], flushing: false,
+  log: { rec: false, t0: 0, rows: [] }
+};
+let TOK = {};
+function readTokens() {
+  const cs = getComputedStyle(document.documentElement);
+  ['bg', 'surface', 'surface-2', 'line', 'fg', 'muted', 'accent', 'ok', 'warn', 'bad', 'rich', 'dot', 'ring', 'cell-s', 'cell-l', 'mesh', 'font-mono']
+    .forEach(k => TOK[k] = cs.getPropertyValue('--' + k).trim());
+}
+
+/* ---------- registro de comunicación + avisos ---------- */
+const commLines = [];
+function log(msg, kind) {
+  const t = new Date(), ts = t.toTimeString().slice(0, 8);
+  commLines.push(`<span class="${kind || ''}">${ts}  ${esc(msg)}</span>`);
+  if (commLines.length > 120) commLines.shift();
+  const el = $('#commLog'); el.innerHTML = commLines.join('\n'); el.scrollTop = el.scrollHeight;
+}
+let toastTimer;
+function toast(msg) {
+  const el = $('#toast'); el.textContent = msg; el.hidden = false;
+  requestAnimationFrame(() => el.classList.add('show'));
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => { el.classList.remove('show'); setTimeout(() => { el.hidden = true; }, 250); }, 3400);
+}
+function connNote(msg, kind) { const n = $('#connNote'); n.hidden = !msg; n.textContent = msg || ''; n.dataset.kind = kind || ''; }
+
+/* ---------- ediciones, escritura y quemado ---------- */
+function applyChanges(T, changes, opt = {}) {
+  const old = new Map();
+  for (const [i, v] of changes) {
+    const nv = clamp(Math.round(v), T.min, T.max);
+    if (nv !== T.values[i]) { old.set(i, T.values[i]); T.values[i] = nv; App.pending[T.key].add(i); }
+  }
+  if (!old.size) return 0;
+  if (opt.undo !== false) { App.undo[T.key].push(old); if (App.undo[T.key].length > 80) App.undo[T.key].shift(); }
+  T.rev++;
+  App.views[T.key]?.onChange([...old.keys()], opt.cls);
+  updateBurnUI();
+  return old.size;
+}
+function undoLast(T) {
+  const old = App.undo[T.key].pop();
+  if (!old) return false;
+  for (const [i, v] of old) { T.values[i] = v; App.pending[T.key].add(i); }
+  T.rev++; App.views[T.key]?.onChange([...old.keys()]); updateBurnUI();
+  return true;
+}
+async function flushWrites() {
+  if (!App.client || App.flushing) return;
+  App.flushing = true;
+  try {
+    for (const key of TABLE_KEYS) {
+      const set = App.pending[key];
+      if (!set.size) continue;
+      const T = App.tables[key], idx = [...set].sort((a, b) => a - b);
+      set.clear();
+      const ranges = []; let s = idx[0], prev = idx[0];
+      for (let k = 1; k < idx.length; k++) { if (idx[k] - prev <= 3) { prev = idx[k]; continue; } ranges.push([s, prev]); s = prev = idx[k]; }
+      ranges.push([s, prev]);
+      for (const [a, b] of ranges) {
+        const bytes = [];
+        for (let i = a; i <= b; i++) bytes.push(T.values[i] - T.translate);
+        try { await App.client.writePage(T.page, a, bytes); }
+        catch (e) { for (let i = a; i <= b; i++) set.add(i); throw e; }
+      }
+    }
+  } catch (e) {
+    log('Error al escribir: ' + e.message, 'err');
+  } finally { App.flushing = false; }
+}
+setInterval(flushWrites, 150);
+
+async function burnAll() {
+  if (!App.client) return;
+  const btn = $('#burnBtn'); btn.disabled = true;
+  try {
+    while (pendingWrites() || App.flushing) { await flushWrites(); await sleep(20); }
+    for (const key of TABLE_KEYS) {
+      const T = App.tables[key];
+      if (T.dirtyCount() || App.extraBurn.has(T.page)) {
+        await App.client.burn(T.page); T.burned.set(T.values); T.rev++; App.extraBurn.delete(T.page); App.views[key]?.onChange(null);
+      }
+    }
+    if (App.extraBurn.has(1)) { await App.client.burn(1); App.extraBurn.delete(1); }
+    toast('Quemado. La ECU guarda estos valores aunque la apagues.');
+  } catch (e) { toast('No se pudo quemar: ' + e.message); log('Error al quemar: ' + e.message, 'err'); }
+  updateBurnUI();
+}
+function updateBurnUI() {
+  const n = TABLE_KEYS.reduce((s, k) => s + App.tables[k].dirtyCount(), 0) + App.extraBurn.size;
+  const btn = $('#burnBtn');
+  btn.disabled = !App.client || n === 0;
+  btn.textContent = n ? `Quemar · ${n}` : 'Quemar';
+  $('#burnText').textContent = !App.client ? 'Sin ECU' : n ? `${n} ${n === 1 ? 'cambio' : 'cambios'} sin quemar` : 'Todo quemado';
+  $('#burnWrap').classList.toggle('pending', n > 0);
+}
+
+/* ============================== conexión ============================== */
+function setStatus(state, text) { const p = $('#statusPill'); p.dataset.state = state; $('#statusText').textContent = text; }
+const MODE_NAME = { virtual: 'ECU virtual', usb: 'USB', ble: 'Bluetooth' };
+
+async function connect(kind) {
+  // La conexión actual se corta recién cuando la nueva abre, salvo que sea del mismo tipo.
+  if (kind === 'virtual' || kind === App.mode) await disconnect(true);
+  connNote('');
+  let transport;
+  if (kind === 'virtual') transport = new LoopbackTransport(VECU);
+  else if (kind === 'usb') {
+    if (!('serial' in navigator)) { connNote('Este navegador no tiene acceso a USB. Abrí Chispa en Chrome o Edge de computadora.', 'bad'); return; }
+    transport = new SerialTransport();
+  } else {
+    if (!('bluetooth' in navigator)) { connNote('Este navegador no tiene Bluetooth web. Usá Chrome en Android o en computadora. En iPhone hace falta una app nativa.', 'bad'); return; }
+    transport = new BleTransport();
+  }
+  setStatus('busy', 'Conectando…');
+  try {
+    await transport.open();
+    if (App.client) { await disconnect(true); setStatus('busy', 'Conectando…'); }
+    const client = new SpeeduinoClient(transport, log);
+    transport.onError = e => { log('Conexión perdida: ' + e.message, 'err'); toast('Se perdió la conexión con la ECU'); disconnect(); };
+    if (kind === 'usb') { log('Puerto abierto a 115200. Esperando que la ECU arranque…'); await sleep(1500); }
+    let sig = null, lastErr = null;
+    for (let i = 0; i < 3 && !sig; i++) { try { sig = await client.signature(); } catch (e) { lastErr = e; await sleep(300); } }
+    if (!sig) throw lastErr || new EcuError('La ECU no respondió');
+    log('Firmware: ' + sig, 'ok');
+    if (!/speeduino/i.test(sig)) log('Aviso: la firma no dice "speeduino". Las tablas pueden tener otro formato.', 'err');
+    const p1 = await client.readPage(1, 0, 128);
+    const alg = p1[37] & 7, ignAlg = (p1[26] >> 4) & 7, cylIdx = (p1[36] >> 4) & 15;
+    const loadName = a => a === 1 ? 'TPS (alfa-N)' : a === 2 ? 'IMAP/EMAP' : 'MAP (speed density)';
+    App.info = {
+      sig, kind, cyl: cylIdx >= 1 && cylIdx <= 6 ? cylIdx : cylIdx === 8 ? 8 : '—', alg, ignAlg,
+      reqFuel: p1[24] / 10, stoich: p1[50] / 10, fuelLoad: loadName(alg), ignLoad: loadName(ignAlg),
+      injOpen: p1[27] / 10, incAfr: (p1[70] & 0x80) !== 0, p1,
+      nInj: (() => { const n = (p1[37] >> 4) & 15; return n >= 1 && n <= 6 ? n : n === 8 ? 8 : null; })()
+    };
+    const p2 = await client.readPage(2, 0, 288);
+    const p3 = await client.readPage(3, 0, 288);
+    const p5 = await client.readPage(5, 0, 288);
+    App.tables.ve.loadPage(p2, alg === 1 ? 0.5 : 2, alg === 1 ? '%' : 'kPa');
+    App.tables.ign.loadPage(p3, ignAlg === 1 ? 0.5 : 2, ignAlg === 1 ? '%' : 'kPa');
+    App.tables.afr.loadPage(p5, alg === 1 ? 0.5 : 2, alg === 1 ? '%' : 'kPa');
+    for (const k of TABLE_KEYS) { App.undo[k] = []; App.pending[k].clear(); }
+    App.extraBurn.clear(); App.wizBackup = null;
+    App.client = client; App.transport = transport; App.mode = kind; App.errs = 0; App.errTotal = 0; App.resets = 0; App.lastSecl = null;
+    const vo = $('#verifyOut'); vo.textContent = 'Compara por CRC32 las tablas de la ECU con las de Chispa.'; vo.dataset.kind = '';
+    TABLE_KEYS.forEach(k => App.views[k].refresh(true));
+    renderInfo(); updateBurnUI(); updateSimUI(); wizUpdate();
+    setStatus('on', MODE_NAME[kind]);
+    toast(`Conectado: ${MODE_NAME[kind]}`);
+    App.polling = true; poll();
+  } catch (e) {
+    try { await transport.close(); } catch (x) {}
+    if (App.client) setStatus('on', MODE_NAME[App.mode]); else setStatus('off', 'Sin conexión');
+    let msg = e.message || String(e);
+    if (e.name === 'NotFoundError') msg = kind === 'ble'
+      ? 'No se eligió ningún puente. Revisá que el ESP32 esté prendido (LED parpadeando) y que la computadora tenga el Bluetooth activado.'
+      : 'No elegiste ningún puerto.';
+    else if (e.name === 'SecurityError' || e.name === 'NotAllowedError') msg = 'El navegador bloqueó el acceso a USB/Bluetooth en esta vista. Abrí Chispa desde https://ssheitt8.github.io/chispa-efi/ en Chrome o Edge.';
+    connNote('No se pudo conectar. ' + msg, 'bad');
+    log('Error al conectar: ' + msg, 'err');
+  }
+}
+async function disconnect(silent) {
+  if (!App.client) return;
+  App.polling = false;
+  const t = App.transport;
+  App.client = null; App.transport = null; App.mode = null; App.live = null;
+  try { await t.close(); } catch (e) {}
+  setStatus('off', 'Sin conexión');
+  renderInfo(); updateBurnUI(); updateSimUI(); renderLive(); wizUpdate();
+  if (!silent) log('Desconectado');
+}
+async function poll() {
+  const client = App.client;
+  while (App.polling && App.client === client) {
+    const t0 = performance.now();
+    try {
+      const d = await client.realtime(0, LIVE_LEN);
+      if (App.client !== client) break;
+      App.live = decodeLive(d); App.liveAt = performance.now(); App.cnt++; App.errs = 0;
+      onLive(App.live);
+    } catch (e) {
+      App.errs++; App.errTotal++;
+      if (App.errs === 1 || App.errs % 10 === 0) log('Lectura en vivo: ' + e.message, 'err');
+      if (App.errs >= 8 && App.mode !== 'virtual') { toast('La ECU dejó de responder'); disconnect(); break; }
+    }
+    await sleep(Math.max(0, 40 - (performance.now() - t0)));
+  }
+}
+setInterval(() => {
+  App.rate = App.cnt; App.cnt = 0;
+  if (App.client) setStatus(App.rate > 0 ? 'on' : 'busy', `${MODE_NAME[App.mode]} · ${App.rate} /s`);
+}, 1000);
+
+function renderInfo() {
+  const el = $('#ecuInfo'), i = App.info;
+  $('#disconnectBtn').disabled = !App.client;
+  $$('.conn-opt').forEach(c => c.classList.toggle('active', !!App.client && c.dataset.mode === App.mode));
+  $$('[data-connect]').forEach(b => { b.textContent = App.client && b.dataset.connect === App.mode ? 'Reconectar' : 'Conectar'; });
+  if (!App.client || !i) { el.innerHTML = '<div><dt>Estado</dt><dd>Sin ECU conectada</dd></div>'; return; }
+  const rows = [['Firmware', i.sig], ['Conexión', MODE_NAME[i.kind]], ['Cilindros', i.cyl], ['Carga combustible', i.fuelLoad],
+    ['Carga encendido', i.ignLoad], ['Inyector base', i.reqFuel.toFixed(1) + ' ms'], ['Tiempo muerto', i.injOpen.toFixed(1) + ' ms'],['Estequiométrico', i.stoich.toFixed(1) + ' : 1']];
+  el.innerHTML = rows.map(([k, v]) => `<div><dt>${esc(k)}</dt><dd>${esc(v)}</dd></div>`).join('');
+}
+
+/* ============================== diagnóstico de banco ============================== */
+function renderDiag() {
+  if (App.view !== 'conexion') return;
+  const L = App.live, el = $('#diag');
+  $('#verifyBtn').disabled = !App.client;
+  if (!App.client) { el.innerHTML = '<div><dt>Estado</dt><dd>Sin datos</dd></div>'; return; }
+  const sync = !L ? '—' : L.sync ? 'Completa' : L.halfSync ? 'Media (falta levas)' : 'Sin sincronía';
+  const rows = [['Sincronía', sync], ['Pérdidas de sincronía', L ? L.syncLoss : '—'], ['Contador de segundos', L ? L.secl : '—'],
+    ['Lecturas por segundo', App.rate], ['Errores de lectura', App.errTotal], ['Reinicios detectados', App.resets]];
+  const html = rows.map(([k, v]) => `<div><dt>${esc(k)}</dt><dd>${esc(v)}</dd></div>`).join('');
+  if (el.innerHTML !== html) el.innerHTML = html;
+}
+setInterval(renderDiag, 250);
+async function verifyTables() {
+  const out = $('#verifyOut');
+  if (!App.client) { out.textContent = 'Conectá una ECU primero.'; return; }
+  out.textContent = 'Verificando…'; out.dataset.kind = '';
+  try {
+    while (pendingWrites() || App.flushing) { await flushWrites(); await sleep(20); }
+    const bad = [];
+    for (const key of TABLE_KEYS) {
+      const T = App.tables[key], remote = await App.client.pageCRC(T.page), local = crc32(T.toPage());
+      const hx = n => n.toString(16).padStart(8, '0');
+      log(`CRC página ${T.page}: ECU ${hx(remote)} · Chispa ${hx(local)}`, remote === local ? 'ok' : 'err');
+      if (remote !== local) bad.push(T.page);
+    }
+    if (bad.length) { out.textContent = `La página ${bad.join(' y ')} no coincide con la ECU. Reconectá para volver a leerla.`; out.dataset.kind = 'bad'; }
+    else { out.textContent = 'Las tablas VE, de avance y de AFR objetivo coinciden byte a byte con la ECU.'; out.dataset.kind = 'ok'; }
+  } catch (e) { out.textContent = 'No se pudo verificar: ' + e.message; out.dataset.kind = 'bad'; }
+}
+
+/* ============================== autoajuste VE ============================== */
+const AT = { on: false, acc: new Float32Array(256).fill(NaN), lastT: 0, lastRpm: 0, lastMap: 0, state: '' };
+function setAutotune(on) {
+  AT.on = on; $('#autoTune').checked = on;
+  if (on) {
+    const T = App.tables.ve, snap = new Map();
+    for (let i = 0; i < 256; i++) snap.set(i, T.values[i]);
+    App.undo.ve.push(snap); AT.acc.fill(NaN);
+  }
+  updateSimNote();
+}
+function autotuneStep(L) {
+  if (!AT.on || App.mode !== 'virtual') return;
+  const now = performance.now(), dt = (now - AT.lastT) / 1000;
+  if (dt < 0.2) return;
+  const dr = Math.abs(L.rpm - AT.lastRpm) / dt, dm = Math.abs(L.map - AT.lastMap) / dt;
+  AT.lastT = now; AT.lastRpm = L.rpm; AT.lastMap = L.map;
+  let st;
+  if (L.rpm < 600) st = 'Arrancá el motor para que el autoajuste trabaje.';
+  else if (L.clt < 70) st = `Esperando temperatura: ${L.clt} °C de 70 °C.`;
+  else if (dr > 450 || dm > 18) st = 'Esperando régimen estable…';
+  else if (L.afr < 9 || L.afr > 20 || !L.afrTarget) st = 'AFR fuera de rango para corregir.';
+  if (st) { setATState(st); return; }
+  setATState('Corrigiendo las celdas alrededor del punto rojo.');
+  const T = App.tables.ve, P = lookup16(T.values, T.x, T.y, L.rpm, L.map), factor = L.afr / L.afrTarget;
+  const corners = [[P.x0, P.y0, (1 - P.tx) * (1 - P.ty)], [P.x1, P.y0, P.tx * (1 - P.ty)], [P.x0, P.y1, (1 - P.tx) * P.ty], [P.x1, P.y1, P.tx * P.ty]];
+  const ch = new Map();
+  for (const [x, y, w] of corners) {
+    if (w < 0.1) continue;
+    const i = y * 16 + x;
+    if (isNaN(AT.acc[i]) || Math.round(AT.acc[i]) !== T.values[i]) AT.acc[i] = T.values[i];
+    AT.acc[i] += (AT.acc[i] * factor - AT.acc[i]) * w * 0.3;
+    const nv = Math.round(AT.acc[i]);
+    if (nv !== T.values[i]) ch.set(i, nv);
+  }
+  if (ch.size) applyChanges(T, ch, { undo: false, cls: 'tuned' });
+}
+function setATState(s) { if (AT.state !== s) { AT.state = s; updateSimNote(); } }
+function updateSimNote() {
+  $('#simNote').textContent = AT.on ? AT.state || 'Autoajuste activo.' :
+    'El autoajuste corrige la tabla VE con el AFR medido, como el VE Analyze de TunerStudio. Trabaja con el motor caliente y en régimen estable.';
+}
+
+/* ============================== datos en vivo ============================== */
+function onLive(L) {
+  const now = performance.now() / 1000, h = App.hist;
+  // el contador de segundos de la ECU solo vuelve a 0 por desborde (255 → 0) o por un reinicio
+  if (App.lastSecl != null && L.secl < App.lastSecl && !(App.lastSecl >= 250 && L.secl <= 5)) {
+    App.resets++;
+    log('La ECU se reinició (el contador de segundos volvió a 0). Revisá la alimentación y el cable USB.', 'err');
+    toast('La ECU se reinició');
+  }
+  App.lastSecl = L.secl;
+  if (!h.length || now - h[h.length - 1].t >= 0.1) {
+    h.push({ t: now, rpm: L.rpm, afr: L.afr, afrT: L.afrTarget });
+    while (h.length && h[0].t < now - 30) h.shift();
+  }
+  if (App.log.rec) logSample(L);
+  autotuneStep(L);
+  scheduleRender();
+}
+let renderQueued = false;
+function scheduleRender() { if (!renderQueued) { renderQueued = true; requestAnimationFrame(() => { renderQueued = false; renderLive(); }); } }
+function renderLive() {
+  const L = App.live;
+  if (App.view === 'tablero') renderDash(L);
+  if (App.view === 'combustible') App.views[App.fuelView].setLive(L);
+  if (App.view === 'encendido') App.views.ign.setLive(L);
+}
+function afrState(afr, tgt) {
+  if (!afr || afr < 5) return { cls: 'off', txt: 'Sin lectura', kind: '' };
+  const d = afr - tgt;
+  if (Math.abs(d) <= 0.4) return { cls: 'ok', txt: 'En objetivo', kind: 'ok' };
+  if (d > 0) return { cls: d > 1.2 ? 'bad' : 'warn', txt: `Pobre +${d.toFixed(1)}`, kind: d > 1.2 ? 'bad' : 'warn' };
+  return { cls: 'rich', txt: `Rica ${d.toFixed(1)}`, kind: 'rich' };
+}
+
+/* ---------- tablero ---------- */
+const G = { cx: 130, cy: 124, r: 98, a0: -135, a1: 135, max: 8000, red: 6800 };
+const gAng = v => G.a0 + (G.a1 - G.a0) * clamp(v / G.max, 0, 1);
+function gPt(a, r) { const t = a * Math.PI / 180; return [G.cx + r * Math.sin(t), G.cy - r * Math.cos(t)]; }
+function gArc(a0, a1, r) {
+  const [x0, y0] = gPt(a0, r), [x1, y1] = gPt(a1, r);
+  return `M${x0.toFixed(2)} ${y0.toFixed(2)} A${r} ${r} 0 ${a1 - a0 > 180 ? 1 : 0} 1 ${x1.toFixed(2)} ${y1.toFixed(2)}`;
+}
+function buildGauge() {
+  let s = `<path class="g-track" d="${gArc(G.a0, G.a1, G.r)}"/><path class="g-red" d="${gArc(gAng(G.red), G.a1, G.r)}"/><path class="g-val" id="gVal" d=""/>`;
+  for (let v = 0; v <= G.max; v += 500) {
+    const a = gAng(v), major = v % 1000 === 0, [x0, y0] = gPt(a, G.r - 10), [x1, y1] = gPt(a, G.r - (major ? 22 : 16));
+    s += `<line class="g-tick${major ? '' : ' minor'}" x1="${x0.toFixed(1)}" y1="${y0.toFixed(1)}" x2="${x1.toFixed(1)}" y2="${y1.toFixed(1)}"/>`;
+    if (major) { const [lx, ly] = gPt(a, G.r - 34); s += `<text class="g-lab" x="${lx.toFixed(1)}" y="${ly.toFixed(1)}">${v / 1000}</text>`; }
+  }
+  s += `<text class="g-lab" x="${G.cx}" y="${G.cy + 70}" style="font-size:10px;letter-spacing:.1em">× 1000</text>`;
+  $('#rpmGauge').innerHTML = s;
+}
+const TILES = [
+  { k: 'map', label: 'MAP', unit: 'kPa', d: 0, min: 0, max: 110 },
+  { k: 'tps', label: 'Acelerador', unit: '%', d: 0, min: 0, max: 100 },
+  { k: 'adv', label: 'Avance', unit: '° APMS', d: 0, min: 0, max: 45 },
+  { k: 've', label: 'VE actual', unit: '%', d: 0, min: 0, max: 120 },
+  { k: 'pw', label: 'Inyección', unit: 'ms', d: 2, min: 0, max: 20 },
+  { k: 'clt', label: 'Motor', unit: '°C', d: 0, min: 0, max: 120, warn: v => v > 100 },
+  { k: 'iat', label: 'Aire de admisión', unit: '°C', d: 0, min: 0, max: 80, warn: v => v > 60 },
+  { k: 'bat', label: 'Batería', unit: 'V', d: 1, min: 8, max: 16, warn: v => v > 0 && v < 11.8 }
+];
+function buildTiles() {
+  $('#tiles').innerHTML = TILES.map(t => `<div class="tile" id="tile-${t.k}"><span class="label">${t.label}</span><span class="tile-v"><span class="tv-n">—</span><small>${t.unit}</small></span><div class="tile-bar"><i></i></div></div>`).join('');
+}
+function renderDash(L) {
+  const rpm = L ? L.rpm : 0;
+  $('#rpmVal').textContent = Math.round(rpm).toLocaleString('es');
+  $('#gVal').setAttribute('d', rpm > 30 ? gArc(G.a0, gAng(rpm), G.r) : '');
+  const chips = [];
+  if (!L) chips.push('<span class="chip">Sin ECU</span>');
+  else if (L.crank) chips.push('<span class="chip" data-kind="accent">Arrancando</span>');
+  else if (L.rpm > 0) chips.push('<span class="chip" data-kind="ok">Motor en marcha</span>');
+  else chips.push(App.mode === 'virtual' ? '<span class="chip">Motor apagado</span>' : '<span class="chip" data-kind="warn">Sin señal de cigüeñal</span>');
+  if (L && L.syncLoss > 0 && App.mode !== 'virtual') chips.push(`<span class="chip" data-kind="warn">Pérdidas de sincronía: ${L.syncLoss}</span>`);
+  if (L && L.rpm > 0 && L.wue > 100) chips.push(`<span class="chip" data-kind="rich">Enriquecimiento en frío +${L.wue - 100} %</span>`);
+  if (L && L.rpm >= G.red) chips.push('<span class="chip" data-kind="bad">Zona roja</span>');
+  const html = chips.join('');
+  const ec = $('#engineChips'); if (ec.innerHTML !== html) ec.innerHTML = html;
+  const st = afrState(L && L.rpm > 0 ? L.afr : 0, L ? L.afrTarget : 14.7);
+  $('#afrVal').innerHTML = (st.cls === 'off' ? '—' : L.afr.toFixed(1)) + '<small>AFR</small>';
+  $('#afrTgt').textContent = L && L.afrTarget ? L.afrTarget.toFixed(1) : '—';
+  const chip = $('#afrChip'); chip.textContent = st.txt; chip.dataset.kind = st.kind;
+  const pos = v => clamp((v - 10) / 10 * 100, 0, 100) + '%';
+  $('#afrTgtMk').style.left = pos(L && L.afrTarget ? L.afrTarget : 14.7);
+  const mk = $('#afrMk'); mk.style.left = pos(st.cls === 'off' ? 10 : L.afr); mk.style.opacity = st.cls === 'off' ? .35 : 1;
+  for (const t of TILES) {
+    const el = $('#tile-' + t.k), v = L ? L[t.k] : null;
+    el.querySelector('.tv-n').textContent = v == null ? '—' : v.toFixed(t.d);
+    el.querySelector('i').style.width = v == null ? '0%' : clamp((v - t.min) / (t.max - t.min) * 100, 0, 100) + '%';
+    el.classList.toggle('warn', !!(v != null && t.warn && t.warn(v)));
+  }
+}
+
+/* ---------- gráficos ---------- */
+function fitCanvas(cv) {
+  const dpr = window.devicePixelRatio || 1, w = cv.clientWidth, h = cv.clientHeight;
+  if (!w || !h) return null;
+  if (cv.width !== Math.round(w * dpr) || cv.height !== Math.round(h * dpr)) { cv.width = Math.round(w * dpr); cv.height = Math.round(h * dpr); }
+  const ctx = cv.getContext('2d'); ctx.setTransform(dpr, 0, 0, dpr, 0, 0); ctx.clearRect(0, 0, w, h);
+  return { ctx, w, h };
+}
+function drawDual(cv, rows, t0, t1, xLabel) {
+  const f = fitCanvas(cv); if (!f) return;
+  const { ctx, w, h } = f, L = 42, R = 12, T = 6, B = 22, GAP = 18, ph = (h - T - B - GAP) / 2;
+  const X = t => L + (t - t0) / Math.max(0.001, t1 - t0) * (w - L - R);
+  const font = TOK['font-mono'] || 'monospace';
+  ctx.font = `11px ${font}`; ctx.textBaseline = 'middle';
+  const panels = [
+    { y: T, min: 0, max: 8000, key: 'rpm', color: TOK.accent, ticks: [0, 2000, 4000, 6000, 8000], fmt: v => v ? v / 1000 + 'k' : '0', fill: true },
+    { y: T + ph + GAP, min: 10, max: 20, key: 'afr', color: TOK.rich, ticks: [10, 12.5, 15, 17.5, 20], fmt: v => String(v), target: 'afrT' }
+  ];
+  for (const p of panels) {
+    const Y = v => p.y + ph - (clamp(v, p.min, p.max) - p.min) / (p.max - p.min) * ph;
+    ctx.lineWidth = 1; ctx.strokeStyle = TOK.line; ctx.fillStyle = TOK.muted; ctx.textAlign = 'right'; ctx.setLineDash([]);
+    for (const tk of p.ticks) { const y = Math.round(Y(tk)) + 0.5; ctx.beginPath(); ctx.moveTo(L, y); ctx.lineTo(w - R, y); ctx.stroke(); ctx.fillText(p.fmt(tk), L - 6, y); }
+    if (!rows.length) continue;
+    if (p.target) {
+      ctx.strokeStyle = TOK.muted; ctx.setLineDash([4, 4]); ctx.lineWidth = 1.2; ctx.beginPath(); let pen = false;
+      for (const r of rows) { if (!r.afr) { pen = false; continue; } const x = X(r.t), y = Y(r[p.target]); pen ? ctx.lineTo(x, y) : ctx.moveTo(x, y); pen = true; }
+      ctx.stroke(); ctx.setLineDash([]);
+    }
+    const segs = []; let cur = null;
+    for (const r of rows) {
+      const ok = p.key === 'rpm' || r.afr > 0;
+      if (!ok) { cur = null; continue; }
+      if (!cur) { cur = []; segs.push(cur); }
+      cur.push([X(r.t), Y(r[p.key])]);
+    }
+    for (const sg of segs) {
+      if (p.fill && sg.length > 1) {
+        ctx.beginPath(); ctx.moveTo(sg[0][0], p.y + ph); sg.forEach(([x, y]) => ctx.lineTo(x, y)); ctx.lineTo(sg[sg.length - 1][0], p.y + ph); ctx.closePath();
+        ctx.globalAlpha = 0.14; ctx.fillStyle = p.color; ctx.fill(); ctx.globalAlpha = 1;
+      }
+      ctx.beginPath(); sg.forEach(([x, y], i) => i ? ctx.lineTo(x, y) : ctx.moveTo(x, y));
+      ctx.strokeStyle = p.color; ctx.lineWidth = 2; ctx.lineJoin = 'round'; ctx.stroke();
+    }
+    const last = segs.length && segs[segs.length - 1][segs[segs.length - 1].length - 1];
+    if (last) { ctx.beginPath(); ctx.arc(last[0], last[1], 3.5, 0, Math.PI * 2); ctx.fillStyle = p.color; ctx.fill(); }
+  }
+  ctx.fillStyle = TOK.muted; ctx.textAlign = 'center';
+  const span = t1 - t0, step = span > 300 ? 60 : span > 60 ? 15 : span > 20 ? 5 : 2;
+  for (let s = 0; s <= span + 0.001; s += step) {
+    const x = xLabel === 'ago' ? X(t1 - s) : X(t0 + s);
+    if (x < L + 8 || x > w - R) continue;
+    ctx.fillText(xLabel === 'ago' ? (s ? `−${s} s` : 'ahora') : fmtDur(s), x, h - 9);
+  }
+}
+const fmtDur = s => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}`;
+setInterval(() => {
+  if (App.view === 'tablero') { const now = performance.now() / 1000; drawDual($('#liveChart'), App.hist, now - 30, now, 'ago'); }
+  if (App.view === 'registro' && App.log.rec) renderLog();
+}, 100);
+
+/* ============================== vista de tabla (2D + 3D) ============================== */
+class TableView {
+  constructor(root, table) {
+    this.root = root; this.t = table; this.dim = 2; this.follow = true;
+    this.sel = { a: 0, b: 0 }; this.near = []; this.cache = new Int16Array(256).fill(-9999); this.dcache = new Uint8Array(256);
+    this.mn = null; this.mx = null; this.yaw = -0.62; this.pitch = 0.98; this.cw = 0;
+    const k = table.key;
+    root.innerHTML = `
+      <div class="tv-head">
+        <div><h2>${table.title}</h2><p>${table.subtitle}</p></div>
+        <div class="seg" role="group" aria-label="Vista de la tabla"><button class="on" data-dim="2">2D</button><button data-dim="3">3D</button></div>
+      </div>
+      <div class="tv-live"><span class="tv-live-txt"><i></i><span class="lt">Sin datos en vivo</span></span>
+        <label class="switch"><input type="checkbox" id="follow-${k}" checked><span>Seguir punto</span></label></div>
+      <div class="tv-main">
+        <div class="tv-2d">
+          <div class="tv-gridwrap"><div class="tv-grid" tabindex="0" aria-label="${table.title}: usá las flechas para moverte y + o − para cambiar"></div><div class="tv-dot" hidden></div></div>
+          <div class="tv-axis-note"><span class="y-unit">↑ carga (kPa)</span><span>rpm →</span></div>
+        </div>
+        <div class="tv-3d" hidden><canvas aria-label="Superficie 3D de ${table.title}"></canvas><p class="hint">Arrastrá para girar</p></div>
+      </div>
+      <div class="tv-side">
+        <div class="card tv-edit">
+          <div class="tv-edit-head"><h3>Celda</h3><span class="tv-sel">—</span></div>
+          <dl class="tv-vals"><div><dt>Valor</dt><dd class="v-now">—</dd></div><div><dt>Quemado</dt><dd class="v-burn">—</dd></div><div><dt>Cambio</dt><dd class="v-diff">—</dd></div></dl>
+          <div class="tv-btns">${table.steps.map((s, i) => `<button class="btn" data-step="${i}">${s[0]}</button>`).join('')}</div>
+          <div class="tv-set"><input type="number" step="any" inputmode="decimal" id="set-${k}" placeholder="Valor exacto" aria-label="Valor exacto para las celdas elegidas"><button class="btn" data-act="set">Fijar</button></div>
+          <div class="tv-btns three"><button class="btn" data-act="interp">Interpolar</button><button class="btn" data-act="smooth">Suavizar</button><button class="btn" data-act="undo">Deshacer</button></div>
+          <p class="tv-help">Tocá una celda o arrastrá para elegir varias. Con teclado: flechas, Mayús para extender, + y −.</p>
+        </div>
+        <div class="sim-slot"></div>
+      </div>`;
+    this.grid = $('.tv-grid', root); this.dot = $('.tv-dot', root); this.wrap2d = $('.tv-2d', root); this.wrap3d = $('.tv-3d', root);
+    this.canvas = $('canvas', this.wrap3d); this.liveTxt = $('.lt', root); this.followEl = $('#follow-' + k, root);
+    if (table.div) this.grid.classList.add('dec');
+    this.buildGrid(); this.bind(); this.select(0, 0);
+    new ResizeObserver(() => { this.cw = 0; if (this.dim === 3) this.draw3d(); }).observe(this.grid);
+    new ResizeObserver(() => { if (this.dim === 3) this.draw3d(); }).observe(this.canvas);
+  }
+  buildGrid() {
+    const g = this.grid; this.cells = new Array(256); this.yl = []; this.xl = [];
+    const frag = document.createDocumentFragment();
+    for (let r = 0; r < 16; r++) {
+      const y = 15 - r, lab = document.createElement('div'); lab.className = 'ax'; frag.appendChild(lab); this.yl[y] = lab;
+      for (let x = 0; x < 16; x++) { const c = document.createElement('div'); c.className = 'cell'; c.dataset.i = y * 16 + x; frag.appendChild(c); this.cells[y * 16 + x] = c; }
+    }
+    const corner = document.createElement('div'); corner.className = 'ax ax-x ax-corner'; corner.textContent = 'rpm'; frag.appendChild(corner);
+    for (let x = 0; x < 16; x++) { const l = document.createElement('div'); l.className = 'ax ax-x' + (x % 2 ? ' odd' : ''); frag.appendChild(l); this.xl[x] = l; }
+    g.appendChild(frag);
+  }
+  bind() {
+    const g = this.grid;
+    const cellAt = e => { const el = document.elementFromPoint(e.clientX, e.clientY); const c = el && el.closest ? el.closest('.cell') : null; return c && g.contains(c) ? +c.dataset.i : null; };
+    g.addEventListener('pointerdown', e => {
+      const i = cellAt(e); if (i == null) return;
+      e.preventDefault(); this.setFollow(false); this.dragging = true; this.anchor = i;
+      if (e.shiftKey) this.select(this.sel.a, i); else this.select(i, i);
+      g.focus({ preventScroll: true });
+    });
+    g.addEventListener('pointermove', e => { if (!this.dragging) return; const i = cellAt(e); if (i != null) this.select(this.anchor, i); });
+    const end = () => { this.dragging = false; };
+    window.addEventListener('pointerup', end); window.addEventListener('pointercancel', end);
+    g.addEventListener('keydown', e => this.onKey(e));
+    $$('[data-dim]', this.root).forEach(b => b.addEventListener('click', () => this.setDim(+b.dataset.dim)));
+    $$('[data-step]', this.root).forEach(b => b.addEventListener('click', () => this.step(+b.dataset.step)));
+    $$('[data-act]', this.root).forEach(b => b.addEventListener('click', () => this.act(b.dataset.act)));
+    $('#set-' + this.t.key, this.root).addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); this.act('set'); } });
+    this.followEl.addEventListener('change', () => this.setFollow(this.followEl.checked));
+    // 3D: arrastrar para girar
+    const cv = this.canvas; let drag = null;
+    cv.addEventListener('pointerdown', e => { drag = { x: e.clientX, y: e.clientY, yaw: this.yaw, pitch: this.pitch }; cv.setPointerCapture(e.pointerId); cv.style.cursor = 'grabbing'; });
+    cv.addEventListener('pointermove', e => {
+      if (!drag) return;
+      this.yaw = drag.yaw + (e.clientX - drag.x) * 0.01;
+      this.pitch = clamp(drag.pitch + (e.clientY - drag.y) * 0.006, 0.25, 1.45);
+      this.draw3d();
+    });
+    const up = () => { drag = null; cv.style.cursor = ''; };
+    cv.addEventListener('pointerup', up); cv.addEventListener('pointercancel', up);
+  }
+  rect() { const ax = this.sel.a % 16, ay = this.sel.a >> 4, bx = this.sel.b % 16, by = this.sel.b >> 4; return { x0: Math.min(ax, bx), x1: Math.max(ax, bx), y0: Math.min(ay, by), y1: Math.max(ay, by) }; }
+  selIdx() { const r = this.rect(), out = []; for (let y = r.y0; y <= r.y1; y++) for (let x = r.x0; x <= r.x1; x++) out.push(y * 16 + x); return out; }
+  select(a, b) {
+    if (this.sel.a === a && this.sel.b === b && this._selDrawn) return;
+    this.sel = { a, b }; this._selDrawn = true;
+    const r = this.rect();
+    for (let i = 0; i < 256; i++) { const x = i % 16, y = i >> 4; this.cells[i].classList.toggle('sel', x >= r.x0 && x <= r.x1 && y >= r.y0 && y <= r.y1); }
+    this.updatePanel();
+  }
+  setFollow(on) { this.follow = on; this.followEl.checked = on; if (on && App.live) this.setLive(App.live); }
+  setDim(d) {
+    this.dim = d;
+    $$('[data-dim]', this.root).forEach(b => b.classList.toggle('on', +b.dataset.dim === d));
+    this.wrap2d.hidden = d !== 2; this.wrap3d.hidden = d !== 3;
+    this.cw = 0;
+    if (d === 3) this.draw3d(); else if (App.live) this.setLive(App.live);
+  }
+  refresh(force) {
+    const T = this.t;
+    for (let y = 0; y < 16; y++) this.yl[y].textContent = T.y[y] % 1 ? T.y[y].toFixed(1) : T.y[y];
+    for (let x = 0; x < 16; x++) this.xl[x].textContent = fmtRpm(T.x[x]);
+    $('.y-unit', this.root).textContent = `↑ carga (${T.loadUnit === '%' ? '% TPS' : 'kPa'})`;
+    this.renderCells(force); this.updatePanel();
+    if (this.dim === 3) this.draw3d();
+  }
+  renderCells(force) {
+    const T = this.t; let mn = Infinity, mx = -Infinity;
+    for (let i = 0; i < 256; i++) { const v = T.values[i]; if (v < mn) mn = v; if (v > mx) mx = v; }
+    const rangeCh = force || mn !== this.mn || mx !== this.mx; this.mn = mn; this.mx = mx;
+    const span = Math.max(1, mx - mn);
+    for (let i = 0; i < 256; i++) {
+      const v = T.values[i], dirty = v !== T.burned[i] ? 1 : 0;
+      if (!rangeCh && this.cache[i] === v && this.dcache[i] === dirty) continue;
+      const c = this.cells[i];
+      if (this.cache[i] !== v || rangeCh) { c.textContent = T.cellFmt ? T.cellFmt(v) : v; c.style.backgroundColor = `hsl(${(232 - 232 * (v - mn) / span).toFixed(0)} var(--cell-s) var(--cell-l))`; }
+      if (this.dcache[i] !== dirty || rangeCh) c.classList.toggle('dirty', !!dirty);
+      this.cache[i] = v; this.dcache[i] = dirty;
+    }
+  }
+  onChange(idxs, cls) {
+    this.renderCells(!idxs);
+    if (idxs && cls) for (const i of idxs) { const c = this.cells[i]; c.classList.remove(cls); void c.offsetWidth; c.classList.add(cls); }
+    this.updatePanel();
+    if (this.dim === 3) this.draw3d();
+  }
+  updatePanel() {
+    const T = this.t, idx = this.selIdx(), r = this.rect(), cfg = T;
+    let now = 0, burn = 0; for (const i of idx) { now += T.values[i]; burn += T.burned[i]; }
+    now /= idx.length; burn /= idx.length;
+    $('.tv-sel', this.root).textContent = idx.length === 1
+      ? `${T.x[r.x0].toLocaleString('es')} rpm · ${T.y[r.y0]} ${T.loadUnit}`
+      : `${r.x1 - r.x0 + 1} × ${r.y1 - r.y0 + 1} celdas`;
+    $('.v-now', this.root).textContent = T.loaded ? cfg.valFmt(now) : '—';
+    $('.v-burn', this.root).textContent = T.loaded ? cfg.valFmt(burn) : '—';
+    const d = cfg.diff(now, burn);
+    const dd = $('.v-diff', this.root); dd.textContent = T.loaded ? cfg.diffFmt(Math.abs(d) < 0.05 ? 0 : d) : '—';
+    dd.style.color = Math.abs(d) < 0.05 ? '' : 'var(--accent)';
+    $('[data-act="undo"]', this.root).disabled = !App.undo[T.key].length;
+    const set = $('#set-' + T.key, this.root);
+    if (document.activeElement !== set) set.value = !T.loaded ? '' : T.div ? (now / T.div).toFixed(1) : Math.round(now);
+  }
+  measure() {
+    const c0 = this.cells[0]; this.cw = c0.offsetWidth; this.ch = c0.offsetHeight;
+    this.colX = []; this.rowY = [];
+    for (let x = 0; x < 16; x++) this.colX[x] = this.cells[x].offsetLeft + this.cw / 2;
+    for (let y = 0; y < 16; y++) this.rowY[y] = this.cells[y * 16].offsetTop + this.ch / 2;
+  }
+  setLive(L) {
+    const T = this.t;
+    if (!L || !T.loaded || L.rpm <= 0) {
+      this.dot.hidden = true; this.setNear([]);
+      this.liveTxt.textContent = L ? 'Motor apagado' : 'Sin datos en vivo';
+      if (this.dim === 3) this.draw3d();
+      return;
+    }
+    const load = T.loadUnit === '%' ? L.tps : L.map, P = lookup16(T.values, T.x, T.y, L.rpm, load);
+    this.P = P;
+    const st = afrState(L.afr, L.afrTarget);
+    const afr = T.key !== 'ign' ? ` · <span class="afr ${st.cls}">AFR ${T.key === 'afr' ? 'medido ' : ''}${L.afr ? L.afr.toFixed(1) : '—'}</span>` : '';
+    this.liveTxt.innerHTML = `${Math.round(L.rpm).toLocaleString('es')} rpm · ${Math.round(load)} ${T.loadUnit} · ${T.valFmt(P.value)}${afr}`;
+    if (this.follow) { const i = Math.round(P.fy) * 16 + Math.round(P.fx); this.select(i, i); }
+    if (this.dim === 2) {
+      if (!this.cw) this.measure();
+      if (!this.cw) return;
+      const px = this.colX[P.x0] + (this.colX[P.x1] - this.colX[P.x0]) * P.tx;
+      const py = this.rowY[P.y0] + (this.rowY[P.y1] - this.rowY[P.y0]) * P.ty;
+      this.dot.hidden = false; this.dot.style.transform = `translate(${(px - 6.5).toFixed(1)}px,${(py - 6.5).toFixed(1)}px)`;
+      this.setNear([...new Set([P.y0 * 16 + P.x0, P.y0 * 16 + P.x1, P.y1 * 16 + P.x0, P.y1 * 16 + P.x1])]);
+    } else this.draw3d();
+  }
+  setNear(list) {
+    const key = list.join(','); if (key === this._nearKey) return; this._nearKey = key;
+    for (const i of this.near) this.cells[i].classList.remove('near');
+    for (const i of list) this.cells[i].classList.add('near');
+    this.near = list;
+  }
+  onKey(e) {
+    const k = e.key, cur = this.sel.b; let x = cur % 16, y = cur >> 4, moved = true;
+    if (k === 'ArrowLeft') x--; else if (k === 'ArrowRight') x++; else if (k === 'ArrowUp') y++; else if (k === 'ArrowDown') y--; else moved = false;
+    if (moved) {
+      e.preventDefault(); this.setFollow(false);
+      const i = clamp(y, 0, 15) * 16 + clamp(x, 0, 15);
+      if (e.shiftKey) this.select(this.sel.a, i); else this.select(i, i);
+      return;
+    }
+    if (k === '+' || k === '=') { e.preventDefault(); this.step(3); }
+    else if (k === '-' || k === '_') { e.preventDefault(); this.step(0); }
+    else if ((e.ctrlKey || e.metaKey) && k.toLowerCase() === 'z') { e.preventDefault(); this.act('undo'); }
+    else if (k === 'i' || k === 'I') this.act('interp');
+    else if (k === 's' || k === 'S') this.act('smooth');
+  }
+  needTable() { if (!this.t.loaded) { toast('Conectá una ECU para editar la tabla'); return false; } return true; }
+  step(n) {
+    if (!this.needTable()) return;
+    const T = this.t, fn = T.steps[n][1], ch = new Map();
+    for (const i of this.selIdx()) { const v = T.values[i], d = fn(v) - v; ch.set(i, v + (Math.abs(d) < 1 ? Math.sign(d) : Math.round(d))); }
+    applyChanges(T, ch);
+  }
+  act(a) {
+    const T = this.t;
+    if (a === 'undo') { if (!undoLast(T)) toast('No hay nada para deshacer'); return; }
+    if (!this.needTable()) return;
+    const idx = this.selIdx(), r = this.rect(), ch = new Map();
+    if (a === 'set') {
+      const v = parseFloat($('#set-' + T.key, this.root).value);
+      if (!isFinite(v)) { toast('Escribí un número para fijar'); return; }
+      for (const i of idx) ch.set(i, v * (T.div || 1));
+    } else if (a === 'interp') {
+      if (r.x0 === r.x1 && r.y0 === r.y1) { toast('Elegí varias celdas arrastrando para interpolar'); return; }
+      const v = (x, y) => T.values[y * 16 + x], A = v(r.x0, r.y0), B = v(r.x1, r.y0), C = v(r.x0, r.y1), D = v(r.x1, r.y1);
+      for (let y = r.y0; y <= r.y1; y++) for (let x = r.x0; x <= r.x1; x++) {
+        const tx = r.x1 === r.x0 ? 0 : (T.x[x] - T.x[r.x0]) / ((T.x[r.x1] - T.x[r.x0]) || 1);
+        const ty = r.y1 === r.y0 ? 0 : (T.y[y] - T.y[r.y0]) / ((T.y[r.y1] - T.y[r.y0]) || 1);
+        ch.set(y * 16 + x, A * (1 - tx) * (1 - ty) + B * tx * (1 - ty) + C * (1 - tx) * ty + D * tx * ty);
+      }
+    } else if (a === 'smooth') {
+      for (const i of idx) {
+        const x = i % 16, y = i >> 4; let s = T.values[i], n = 1;
+        for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) {
+          const xx = x + dx, yy = y + dy; if (xx < 0 || yy < 0 || xx > 15 || yy > 15) continue;
+          s += T.values[yy * 16 + xx]; n++;
+        }
+        ch.set(i, s / n);
+      }
+    }
+    if (!applyChanges(T, ch, { cls: 'tuned' })) toast('Sin cambios: las celdas ya tenían esos valores');
+  }
+  draw3d() {
+    const f = fitCanvas(this.canvas); if (!f) return;
+    const { ctx, w, h } = f, T = this.t;
+    if (!T.loaded) { ctx.fillStyle = TOK.muted; ctx.font = `14px ${TOK['font-mono']}`; ctx.textAlign = 'center'; ctx.fillText('Conectá una ECU para ver la superficie', w / 2, h / 2); return; }
+    const mn = this.mn ?? 0, mx = this.mx ?? 1, span = Math.max(1, mx - mn);
+    const cy = Math.cos(this.yaw), sy = Math.sin(this.yaw), cp = Math.cos(this.pitch), sp = Math.sin(this.pitch);
+    const unit = (fx, fy, pz) => {
+      const px = fx / 15 - 0.5, py = fy / 15 - 0.5, X = px * cy - py * sy, Y = px * sy + py * cy;
+      return [X, -(Y * sp + pz * cp), Y * cp - pz * sp];
+    };
+    // encuadre fijo según la rotación (las 8 esquinas de la caja), así la superficie no "respira" al editar
+    let bx0 = Infinity, bx1 = -Infinity, by0 = Infinity, by1 = -Infinity;
+    for (const fx of [0, 15]) for (const fy of [0, 15]) for (const pz of [0, 0.5]) {
+      const [X, Y] = unit(fx, fy, pz); bx0 = Math.min(bx0, X); bx1 = Math.max(bx1, X); by0 = Math.min(by0, Y); by1 = Math.max(by1, Y);
+    }
+    const scale = Math.min((w - 70) / (bx1 - bx0), (h - 64) / (by1 - by0));
+    const ox = w / 2 - (bx0 + bx1) / 2 * scale, oy = h / 2 - (by0 + by1) / 2 * scale - 6;
+    const proj = (fx, fy, v) => { const [X, Y, Z] = unit(fx, fy, (v - mn) / span * 0.5); return [ox + X * scale, oy + Y * scale, Z]; };
+    const sat = TOK['cell-s'] || '70%', lig = TOK['cell-l'] || '57%';
+    // base
+    ctx.strokeStyle = TOK.line; ctx.lineWidth = 1; ctx.beginPath();
+    [[0, 0], [15, 0], [15, 15], [0, 15], [0, 0]].forEach(([a, b], i) => { const p = proj(a, b, mn); i ? ctx.lineTo(p[0], p[1]) : ctx.moveTo(p[0], p[1]); });
+    ctx.stroke();
+    const P = [];
+    for (let y = 0; y < 16; y++) for (let x = 0; x < 16; x++) P[y * 16 + x] = proj(x, y, T.values[y * 16 + x]);
+    const quads = [];
+    for (let y = 0; y < 15; y++) for (let x = 0; x < 15; x++) {
+      const a = P[y * 16 + x], b = P[y * 16 + x + 1], c = P[(y + 1) * 16 + x + 1], d = P[(y + 1) * 16 + x];
+      const v = (T.values[y * 16 + x] + T.values[y * 16 + x + 1] + T.values[(y + 1) * 16 + x + 1] + T.values[(y + 1) * 16 + x]) / 4;
+      quads.push({ pts: [a, b, c, d], z: (a[2] + b[2] + c[2] + d[2]) / 4, v });
+    }
+    quads.sort((q1, q2) => q2.z - q1.z);
+    ctx.lineWidth = 0.6; ctx.strokeStyle = TOK.mesh;
+    for (const q of quads) {
+      ctx.beginPath(); q.pts.forEach((p, i) => i ? ctx.lineTo(p[0], p[1]) : ctx.moveTo(p[0], p[1])); ctx.closePath();
+      ctx.fillStyle = `hsl(${(232 - 232 * (q.v - mn) / span).toFixed(0)} ${sat} ${lig})`; ctx.fill(); ctx.stroke();
+    }
+    // etiquetas de ejes
+    ctx.fillStyle = TOK.muted; ctx.font = `11px ${TOK['font-mono']}`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    const lab = (fx, fy, txt) => { const p = proj(fx, fy, mn); ctx.fillText(txt, p[0], p[1] + 14); };
+    lab(0, -1.2, fmtRpm(T.x[0])); lab(15, -1.2, fmtRpm(T.x[15]) + ' rpm');
+    lab(-1.6, 0, String(T.y[0])); lab(-1.6, 15, T.y[15] + ' ' + T.loadUnit);
+    // punto en vivo
+    const L = App.live;
+    if (L && L.rpm > 0 && this.P) {
+      const top = proj(this.P.fx, this.P.fy, this.P.value), base = proj(this.P.fx, this.P.fy, mn);
+      ctx.strokeStyle = TOK.dot; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(base[0], base[1]); ctx.lineTo(top[0], top[1]); ctx.stroke();
+      ctx.beginPath(); ctx.arc(top[0], top[1], 6, 0, Math.PI * 2); ctx.fillStyle = TOK.dot; ctx.fill(); ctx.lineWidth = 2; ctx.strokeStyle = TOK.ring; ctx.stroke();
+    }
+  }
+}
+
+/* ============================== asistente de mapa base ============================== */
+const AIR_DENSITY = 1.1843e-3;   // g/cc de aire a 100 kPa y 21 °C
+const FUEL_DENSITY = 0.72;       // g/cc, el mismo criterio que la calculadora de TunerStudio
+const FUELS = {
+  gasolina: { name: 'Gasolina', stoich: 14.7, bsfc: 0.50, adv: 0 },
+  e85: { name: 'E85', stoich: 9.8, bsfc: 0.70, adv: 4 },
+  e100: { name: 'Etanol E100', stoich: 9.0, bsfc: 0.75, adv: 5 }
+};
+// Formas genéricas de VE y avance por preparación (punto de partida, no un modelo exacto)
+const PROFILES = {
+  calle: { vMin: 48, vMax: 90, peak: 0.58, kLow: 0.30, kHigh: 0.30, idleAdv: 12, lowMax: 36, wotMax: 26, idleKpa: 35 },
+  leve: { vMin: 42, vMax: 95, peak: 0.70, kLow: 0.38, kHigh: 0.20, idleAdv: 14, lowMax: 37, wotMax: 28, idleKpa: 40 },
+  comp: { vMin: 36, vMax: 102, peak: 0.80, kLow: 0.48, kHigh: 0.12, idleAdv: 16, lowMax: 38, wotMax: 30, idleKpa: 50 }
+};
+const OCTANE = { 91: -2, 95: 0, 98: 1.5 };
+const WIZ_KEY = 'chispa.wiz.v1';
+const WIZ_DEFAULT = { cc: VENGINE.cc, cyl: VENGINE.cyl, rpm: VENGINE.rpm, idle: VENGINE.idle, prof: 'calle', turbo: false, boost: 0.8,
+  flow: VENGINE.flow, nInj: VENGINE.cyl, pRated: VENGINE.pRated, pWork: VENGINE.pWork, dead: VENGINE.dead, fuel: 'gasolina', oct: 95 };
+let wizRes = null;
+
+function wizRpmBins(rpmMax) {
+  const top = clamp(Math.round(rpmMax / 100) * 100, 2000, 25500), b = [];
+  for (let i = 0; i < 16; i++) {
+    let v = Math.round((500 + (top - 500) * (i / 15) ** 1.3) / 100) * 100;
+    if (i && v <= b[i - 1]) v = b[i - 1] + 100;
+    b.push(v);
+  }
+  return b;
+}
+function wizLoadBins(maxKpa) {
+  const b = [], even = v => Math.round(v / 2) * 2;
+  if (maxKpa <= 100) for (let i = 0; i < 16; i++) b.push(even(20 + 80 * i / 15));
+  else {
+    for (let i = 0; i < 10; i++) b.push(even(20 + 80 * i / 9));          // vacío y crucero
+    for (let i = 1; i <= 6; i++) b.push(even(100 + (maxKpa - 100) * i / 6)); // zona de turbo
+  }
+  for (let i = 1; i < 16; i++) if (b[i] <= b[i - 1]) b[i] = b[i - 1] + 2;
+  return b;
+}
+function wizVE(p, rpm, kpa, rpmMax) {
+  const peak = p.peak * rpmMax;
+  const s = rpm <= peak ? 1 - p.kLow * (1 - rpm / peak) ** 2 : 1 - p.kHigh * ((rpm - peak) / Math.max(1, rpmMax - peak)) ** 2;
+  const l = clamp((kpa - 20) / 80, 0, 1);
+  let v = p.vMin + (p.vMax - p.vMin) * l ** 0.75;
+  if (kpa > 100) v *= 1 + 0.06 * (kpa - 100) / 100;
+  return v * Math.max(s, 0.5);
+}
+function wizLambda(rpm, kpa, rpmMax) {
+  let lam = kpa <= 60 ? 1 : kpa <= 90 ? 1 - (kpa - 60) / 30 * 0.10 : kpa <= 100 ? 0.90 - (kpa - 90) / 10 * 0.03 : 0.87 - (kpa - 100) / 100 * 0.09;
+  if (rpm > 0.85 * rpmMax && kpa > 80) lam -= 0.01;
+  return clamp(lam, 0.75, 1);
+}
+function wizAdv(p, rpm, kpa, w, fuel) {
+  const wotMax = p.wotMax + (w.fuel === 'gasolina' ? (OCTANE[w.oct] || 0) : fuel.adv) - (w.turbo ? 2 : 0);
+  const advLow = rpm <= w.idle ? p.idleAdv : p.idleAdv + (p.lowMax - p.idleAdv) * (1 - Math.exp(-(rpm - w.idle) / 1600));
+  const advWot = 10 + (wotMax - 10) * (1 - Math.exp(-Math.max(0, rpm - 500) / 1800));
+  const l = clamp((kpa - 30) / 70, 0, 1);
+  let a = advLow * (1 - l) + advWot * l;
+  if (kpa > 100) a = advWot - (kpa - 100) * 0.10;   // 1° menos cada 10 kPa de turbo
+  return clamp(Math.round(a), 0, 45);
+}
+function wizRead() {
+  const v = id => $('#w-' + id).value;
+  return { cc: +v('cc'), cyl: +v('cyl'), rpm: +v('rpm'), idle: +v('idle'), prof: v('prof'),
+    turbo: $('#w-asp [data-asp="turbo"]').classList.contains('on'), boost: +v('boost'),
+    flow: +v('flow'), nInj: +v('ninj'), pRated: +v('prated'), pWork: +v('pwork'), dead: +v('dead'), fuel: v('fuel'), oct: +v('oct') };
+}
+function wizFill(w) {
+  const set = (id, val) => { $('#w-' + id).value = String(val); };
+  set('cc', w.cc); set('cyl', w.cyl); set('rpm', w.rpm); set('idle', w.idle); set('prof', w.prof); set('boost', w.boost);
+  set('flow', w.flow); set('ninj', w.nInj); set('prated', w.pRated); set('pwork', w.pWork); set('dead', w.dead); set('fuel', w.fuel); set('oct', w.oct);
+  $$('#w-asp button').forEach(b => b.classList.toggle('on', (b.dataset.asp === 'turbo') === !!w.turbo));
+}
+function wizCalc(w) {
+  const ecu = App.client ? App.info : null;   // datos de la ECU conectada, si hay
+  const errs = [], warns = [];
+  const chk = (ok, msg) => { if (!ok) errs.push(msg); };
+  chk(w.cc >= 50 && w.cc <= 10000, 'La cilindrada tiene que estar entre 50 y 10 000 cc.');
+  chk(w.rpm >= 2000 && w.rpm <= 20000, 'El régimen máximo tiene que estar entre 2000 y 20 000 rpm.');
+  chk(w.idle >= 400 && w.idle < w.rpm, 'El ralentí tiene que ser de al menos 400 rpm y menor que el régimen máximo.');
+  chk(w.flow >= 20 && w.flow <= 3000, 'El caudal del inyector tiene que estar entre 20 y 3000 cc/min.');
+  chk(w.pRated > 0 && w.pWork > 0, 'Las presiones de combustible tienen que ser mayores que 0.');
+  chk(w.dead >= 0 && w.dead <= 3, 'El tiempo muerto tiene que estar entre 0 y 3 ms.');
+  chk(!w.turbo || (w.boost > 0 && w.boost <= 3), 'La presión de turbo tiene que estar entre 0.1 y 3 bar.');
+  if (errs.length) return { errs, warns };
+  const fuel = FUELS[w.fuel] || FUELS.gasolina, p = PROFILES[w.prof] || PROFILES.calle;
+  const flow = w.flow * Math.sqrt(w.pWork / w.pRated);                         // cc/min a la presión de trabajo
+  const fuelCyl = (w.cc / w.cyl) * AIR_DENSITY / fuel.stoich / FUEL_DENSITY;    // cc por cilindro y ciclo (VE 100 %, 100 kPa)
+  const reqFuel = fuelCyl * (w.cyl / w.nInj) / (flow / 60000);                   // ms, ciclo completo
+  const incAfr = !!(ecu && ecu.incAfr);
+  const maxKpa = w.turbo ? 100 + Math.round(w.boost * 100) : 100;
+  const xb = wizRpmBins(w.rpm), yb = wizLoadBins(maxKpa), ve = [], ign = [], afr = [];
+  const tableVE = (rpm, kpa) => {
+    const margin = 1 + 0.08 * clamp((kpa - 60) / 40, 0, 1);   // margen de seguridad: más rico a plena carga
+    return wizVE(p, rpm, kpa, w.rpm) * margin / (incAfr ? 1 : wizLambda(rpm, kpa, w.rpm));
+  };
+  for (let y = 0; y < 16; y++) for (let x = 0; x < 16; x++) {
+    const rpm = xb[x], kpa = yb[y];
+    ve.push(clamp(Math.round(tableVE(rpm, kpa)), 1, 255));
+    ign.push(wizAdv(p, rpm, kpa, w, fuel));
+    afr.push(clamp(Math.round(wizLambda(rpm, kpa, w.rpm) * fuel.stoich * 10), 70, 255));
+  }
+  // Pulso por ciclo = reqFuel × VE × MAP; con "Incorporate AFR" la ECU además multiplica por estequiométrico/objetivo
+  const pwCycle = (rpm, kpa) => reqFuel * tableVE(rpm, kpa) / 100 * kpa / 100 * (incAfr ? 1 / wizLambda(rpm, kpa, w.rpm) : 1);
+  const duty = (pwCycle(w.rpm, maxKpa) + 2 * w.dead) / (120000 / w.rpm) * 100;   // dos inyecciones por ciclo
+  const pwIdleNet = pwCycle(w.idle, p.idleKpa) / 2;
+  const hp = flow / 10.5 * w.nInj * 0.85 / (fuel.bsfc + (w.turbo ? 0.1 : 0));
+
+  if (reqFuel > 25.5) errs.push(`El inyector base da ${reqFuel.toFixed(1)} ms y Speeduino acepta hasta 25.5 ms. Usá inyectores más grandes o más inyectores.`);
+  if (ecu && ecu.alg !== 0) errs.push(`La ECU usa ${ecu.fuelLoad} como carga. Este asistente arma mapas por MAP: cambiá el algoritmo en TunerStudio (Engine Constants).`);
+  if (ecu && ecu.ignAlg !== 0) errs.push(`La tabla de avance de la ECU usa ${ecu.ignLoad} como carga. Pasala a MAP en TunerStudio para usar este mapa.`);
+  if (ecu && typeof ecu.cyl === 'number' && ecu.cyl !== w.cyl) errs.push(`La ECU está configurada con ${ecu.cyl} cilindros y acá pusiste ${w.cyl}. Corregí uno de los dos (en TunerStudio: Engine Constants).`);
+  if (ecu && ecu.nInj && ecu.nInj !== w.nInj) warns.push(['warn', `La ECU tiene ${ecu.nInj} inyectores configurados y acá pusiste ${w.nInj}. Revisalo en TunerStudio.`]);
+  if (reqFuel < 2) warns.push(['warn', `Inyector base muy corto (${reqFuel.toFixed(1)} ms): los inyectores son grandes para este motor.`]);
+  if (duty > 90) warns.push(['bad', `A ${w.rpm.toLocaleString('es')} rpm y ${maxKpa} kPa los inyectores quedarían abiertos el ${duty.toFixed(0)} % del tiempo. No alcanzan: hace falta más caudal.`]);
+  else if (duty > 80) warns.push(['warn', `Ciclo útil de ${duty.toFixed(0)} % a plena carga: estás cerca del límite de los inyectores.`]);
+  if (pwIdleNet < 0.6) warns.push(['warn', `El pulso útil en ralentí es de solo ${pwIdleNet.toFixed(2)} ms. Con inyectores tan grandes el ralentí puede quedar inestable.`]);
+  if (maxKpa > 250) warns.push(['warn', `Con ${maxKpa} kPa absolutos necesitás un sensor MAP de 3 bar o más. El MPX4250 llega a 250 kPa.`]);
+  if (w.nInj < w.cyl) warns.push(['warn', 'Con menos inyectores que cilindros (inyección monopunto), compará el inyector base con la calculadora de TunerStudio antes de arrancar.']);
+  if (incAfr) warns.push(['ok', 'La ECU tiene "Incorporate AFR" prendido: la tabla VE se arma sin el enriquecimiento, porque la ECU lo aplica con la tabla de AFR objetivo.']);
+  if (!errs.length && warns.every(x => x[0] === 'ok')) warns.push(['ok', 'Los inyectores alcanzan para este motor con margen.']);
+  return { errs, warns, reqFuel, flow, xb, yb, ve, ign, afr, duty, pwIdle: pwIdleNet + w.dead, hp, maxKpa, fuel, w };
+}
+function drawThumb(cv, vals) {
+  const ctx = cv.getContext('2d'), n = 16, s = cv.width / n;
+  let mn = Infinity, mx = -Infinity; for (const v of vals) { mn = Math.min(mn, v); mx = Math.max(mx, v); }
+  const span = Math.max(1, mx - mn), sat = TOK['cell-s'] || '70%', lig = TOK['cell-l'] || '57%';
+  ctx.clearRect(0, 0, cv.width, cv.height);
+  for (let y = 0; y < n; y++) for (let x = 0; x < n; x++) {
+    const v = vals[y * n + x];
+    ctx.fillStyle = `hsl(${(232 - 232 * (v - mn) / span).toFixed(0)} ${sat} ${lig})`;
+    ctx.fillRect(x * s, (n - 1 - y) * s, s - 0.6, s - 0.6);   // carga alta arriba, como en las tablas
+  }
+  return [mn, mx];
+}
+function wizUpdate() {
+  if (!$('#wizForm')) return;
+  const w = wizRead();
+  $('#w-boost-f').hidden = !w.turbo;
+  $('#w-oct-f').hidden = w.fuel !== 'gasolina';
+  store.set(WIZ_KEY, w);
+  const r = wizRes = wizCalc(w);
+  const out = $('#wizOut'), warn = $('#wizWarn');
+  if (r.reqFuel == null) {
+    out.innerHTML = '';
+  } else {
+    const rows = [['Inyector base', `${r.reqFuel.toFixed(1)} ms`], ['Ciclo útil máximo', `${r.duty.toFixed(0)} %`], ['Pulso en ralentí', `${r.pwIdle.toFixed(2)} ms`],
+      ['Alcanzan para', `≈ ${Math.round(r.hp / 5) * 5} CV`], ['Estequiométrico', `${r.fuel.stoich.toFixed(1)} : 1`]];
+    if (Math.abs(r.flow - w.flow) > 0.5) rows.push(['Caudal a esa presión', `${Math.round(r.flow)} cc/min`]);
+    out.innerHTML = rows.map(([k, v]) => `<div><dt>${esc(k)}</dt><dd>${esc(v)}</dd></div>`).join('');
+    const [a, b] = drawThumb($('#th-ve'), r.ve), [c, d] = drawThumb($('#th-ign'), r.ign), [e, f] = drawThumb($('#th-afr'), r.afr);
+    $('#th-ve-r').textContent = `${a}–${b} %`; $('#th-ign-r').textContent = `${c}–${d}°`; $('#th-afr-r').textContent = `${(e / 10).toFixed(1)}–${(f / 10).toFixed(1)}`;
+  }
+  const items = r.errs.map(m => ['bad', m]).concat(r.warns);
+  warn.innerHTML = items.map(([k, m]) => `<li data-kind="${k}">${esc(m)}</li>`).join('');
+  const apply = $('#wizApply');
+  apply.disabled = !App.client || r.errs.length > 0;
+  apply.title = !App.client ? 'Conectá una ECU para aplicar' : '';
+  $('#wizRestore').hidden = !App.wizBackup || !App.client;
+  $('#wizVirtual').hidden = App.mode !== 'virtual';
+}
+function wizPage(vals, xb, yb, translate) {
+  const b = new Uint8Array(288);
+  for (let i = 0; i < 256; i++) b[i] = clamp(vals[i] - translate, 0, 255);
+  for (let i = 0; i < 16; i++) { b[256 + i] = Math.round(xb[i] / 100); b[272 + i] = Math.round(yb[i] / 2); }
+  return b;
+}
+async function writeBaseMap(m) {
+  const c = App.client;
+  await c.writePage(1, 24, [m.b24]); await c.writePage(1, 27, [m.b27]); await c.writePage(1, 50, [m.b50]);
+  const p1 = App.info.p1; p1[24] = m.b24; p1[27] = m.b27; p1[50] = m.b50;
+  App.info.reqFuel = m.b24 / 10; App.info.injOpen = m.b27 / 10; App.info.stoich = m.b50 / 10;
+  for (const [key, bytes] of [['ve', m.p2], ['ign', m.p3], ['afr', m.p5]]) {
+    const T = App.tables[key];
+    await c.writePage(T.page, 0, Array.from(bytes));
+    const burned = T.burned.slice();
+    T.loadPage(bytes, 2, 'kPa'); T.burned.set(burned);
+    App.undo[key] = []; App.extraBurn.add(T.page); App.views[key].refresh(true);
+  }
+  App.extraBurn.add(1);
+  log(`Mapa base escrito: reqFuel ${(m.b24 / 10).toFixed(1)} ms, tiempo muerto ${(m.b27 / 10).toFixed(1)} ms, páginas 2, 3 y 5`, 'ok');
+  renderInfo(); updateBurnUI();
+}
+async function wizApply() {
+  const r = wizRes, msg = $('#wizMsg');
+  $('#wizConfirm').hidden = true;
+  if (!App.client || !r || r.errs.length) return;
+  const btn = $('#wizApply'); btn.disabled = true; msg.textContent = 'Escribiendo en la ECU…';
+  try {
+    while (pendingWrites() || App.flushing) { await flushWrites(); await sleep(20); }
+    const T = App.tables, p1 = App.info.p1;
+    const backup = { b24: p1[24], b27: p1[27], b50: p1[50], p2: T.ve.toPage(), p3: T.ign.toPage(), p5: T.afr.toPage() };
+    await writeBaseMap({ b24: Math.round(r.reqFuel * 10), b27: Math.round(r.w.dead * 10), b50: Math.round(r.fuel.stoich * 10),
+      p2: wizPage(r.ve, r.xb, r.yb, 0), p3: wizPage(r.ign, r.xb, r.yb, -40), p5: wizPage(r.afr, r.xb, r.yb, 0) });
+    App.wizBackup = backup;
+    msg.textContent = App.mode === 'virtual'
+      ? 'Listo: el mapa base ya está andando en la ECU virtual. Revisalo en Inyección y Encendido, y tocá Quemar para guardarlo.'
+      : 'Listo: el mapa base está en la memoria de la ECU. Revisalo, tocá Quemar y reiniciá la ECU: Speeduino toma el inyector base y el tiempo muerto recién al arrancar.';
+    toast('Mapa base cargado. Falta quemarlo.');
+  } catch (e) {
+    msg.textContent = 'No se pudo escribir el mapa base: ' + e.message + '. Reconectá la ECU para releer lo que quedó.';
+    log('Error al escribir el mapa base: ' + e.message, 'err');
+  }
+  wizUpdate();
+}
+async function wizRestore() {
+  const b = App.wizBackup, msg = $('#wizMsg');
+  if (!App.client || !b) return;
+  try {
+    while (pendingWrites() || App.flushing) { await flushWrites(); await sleep(20); }
+    await writeBaseMap(b);
+    App.wizBackup = null;
+    msg.textContent = 'Volviste al mapa anterior. Si ya estaba quemado, no hace falta quemar de nuevo, pero no molesta.';
+    toast('Mapa anterior restaurado');
+  } catch (e) { msg.textContent = 'No se pudo restaurar: ' + e.message; }
+  wizUpdate();
+}
+function wizInit() {
+  wizFill(Object.assign({}, WIZ_DEFAULT, store.get(WIZ_KEY, {})));
+  $('#wizForm').addEventListener('input', wizUpdate);
+  $('#wizForm').addEventListener('change', wizUpdate);
+  $('#wizForm').addEventListener('submit', e => e.preventDefault());
+  $$('#w-asp button').forEach(b => b.addEventListener('click', () => { $$('#w-asp button').forEach(x => x.classList.toggle('on', x === b)); wizUpdate(); }));
+  $('#w-cyl').addEventListener('change', () => { $('#w-ninj').value = $('#w-cyl').value; wizUpdate(); });
+  $('#wizApply').addEventListener('click', () => { $('#wizConfirm').hidden = false; $('#wizYes').focus(); });
+  $('#wizNo').addEventListener('click', () => { $('#wizConfirm').hidden = true; });
+  $('#wizYes').addEventListener('click', wizApply);
+  $('#wizRestore').addEventListener('click', wizRestore);
+  $('#wizVirtual').addEventListener('click', () => { wizFill(WIZ_DEFAULT); wizUpdate(); });
+  wizUpdate();
+}
+
+/* ============================== registro de datos ============================== */
+function logSample(L) {
+  const t = (performance.now() - App.log.t0) / 1000, rows = App.log.rows, last = rows[rows.length - 1];
+  if (last && t - last.t < 0.095) return;
+  rows.push({ t, rpm: L.rpm, map: L.map, tps: L.tps, afr: L.afr, afrT: L.afrTarget, adv: L.adv, ve: L.ve, pw: L.pw, clt: L.clt, iat: L.iat, bat: L.bat });
+  if (rows.length >= 36000) toggleRec();
+}
+function toggleRec() {
+  const lg = App.log;
+  if (!lg.rec) {
+    if (!App.client) { toast('Conectá una ECU para grabar'); return; }
+    lg.rows = []; lg.t0 = performance.now(); lg.rec = true;
+  } else lg.rec = false;
+  renderLog();
+}
+function toCSV() {
+  const head = 'tiempo_s,rpm,map_kpa,tps_pct,afr,afr_objetivo,avance_grados,ve_pct,pw_ms,motor_c,aire_c,bateria_v';
+  return head + '\n' + App.log.rows.map(r => [r.t.toFixed(2), r.rpm, r.map, r.tps, r.afr, r.afrT, r.adv, r.ve, r.pw.toFixed(3), r.clt, r.iat, r.bat].join(',')).join('\n');
+}
+function renderLog() {
+  const lg = App.log, rows = lg.rows, has = rows.length > 0;
+  const st = $('#logState'); st.textContent = lg.rec ? 'Grabando' : has ? 'Grabación lista' : 'Detenido'; st.dataset.kind = lg.rec ? 'bad' : has ? 'ok' : '';
+  const b = $('#logBtn'); b.lastElementChild.textContent = lg.rec ? 'Detener' : 'Grabar'; b.classList.toggle('danger', lg.rec); b.classList.toggle('primary', !lg.rec);
+  $('#logCopy').disabled = !has || lg.rec; $('#logDownload').disabled = !has || lg.rec; $('#logClear').disabled = !has || lg.rec;
+  const dur = has ? rows[rows.length - 1].t : 0;
+  $('#stDur').textContent = fmtDur(dur); $('#stN').textContent = rows.length.toLocaleString('es');
+  let rmax = 0, amin = 99, amax = 0, cmax = -99;
+  for (const r of rows) { if (r.rpm > rmax) rmax = r.rpm; if (r.afr > 0) { amin = Math.min(amin, r.afr); amax = Math.max(amax, r.afr); } cmax = Math.max(cmax, r.clt); }
+  $('#stRpm').textContent = has ? rmax.toLocaleString('es') : '—';
+  $('#stAfr').textContent = amax ? `${amin.toFixed(1)} / ${amax.toFixed(1)}` : '—';
+  $('#stClt').textContent = has ? cmax + ' °C' : '—';
+  drawDual($('#logChart'), rows, 0, Math.max(dur, 5), 'elapsed');
+}
+
+/* ============================== simulador: controles ============================== */
+const SCN = { idle: 0, cruise: 14, wot: 100 };
+function updateSimUI() {
+  const virt = App.mode === 'virtual', s = VECU.s, panel = $('#simPanel');
+  panel.hidden = !virt;
+  $('#engineBtn').textContent = s.running || s.crankT > 0 ? 'Apagar motor' : 'Arrancar motor';
+  $('#engineBtn').classList.toggle('primary', !(s.running || s.crankT > 0));
+  const sl = $('#tpsSlider');
+  if (document.activeElement !== sl) sl.value = Math.round(s.tpsTarget);
+  sl.style.setProperty('--p', sl.value + '%');
+  $('#tpsOut').textContent = Math.round(s.tps) + ' %';
+  $$('[data-scn]').forEach(b => {
+    const k = b.dataset.scn;
+    b.classList.toggle('on', k === 'auto' ? s.driver === 'auto' : s.driver !== 'auto' && (s.running || s.crankT > 0) && Math.round(s.tpsTarget) === SCN[k]);
+  });
+}
+setInterval(updateSimUI, 120);
+function placeSim() {
+  const slot = $$(`#v-${App.view} .sim-slot`).find(s => !s.closest('[hidden]'));
+  if (slot && $('#simPanel').parentElement !== slot) slot.appendChild($('#simPanel'));
+  $('#simPanel').style.display = slot ? '' : 'none';
+}
+
+/* ============================== navegación ============================== */
+const VIEWS = ['tablero', 'combustible', 'encendido', 'motor', 'registro', 'conexion'];
+function show(view) {
+  if (!VIEWS.includes(view)) view = 'tablero';
+  App.view = view;
+  VIEWS.forEach(v => { $('#v-' + v).hidden = v !== view; });
+  $$('.tab').forEach(t => t.toggleAttribute('aria-current', t.dataset.view === view));
+  $$('.tab').forEach(t => { if (t.dataset.view === view) t.setAttribute('aria-current', 'page'); });
+  placeSim();
+  if (view === 'combustible') { const fv = App.views[App.fuelView]; fv.cw = 0; fv.refresh(); }
+  if (view === 'motor') wizUpdate();
+  if (view === 'encendido') { App.views.ign.cw = 0; App.views.ign.refresh(); }
+  if (view === 'registro') renderLog();
+  if (view === 'conexion') renderDiag();
+  renderLive();
+}
+function route() { show((location.hash || '').slice(1) || 'tablero'); }
+
+/* ============================== inicio ============================== */
+function init() {
+  readTokens();
+  const mq = window.matchMedia('(prefers-color-scheme: dark)');
+  const retheme = () => {
+    readTokens(); renderLive();
+    Object.values(App.views).forEach(v => { if (v.dim === 3) v.draw3d(); });
+    if (App.view === 'registro') renderLog();
+    wizUpdate();
+  };
+  mq.addEventListener ? mq.addEventListener('change', retheme) : mq.addListener(retheme);
+  new MutationObserver(retheme).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
+  if (document.fonts && document.fonts.ready) document.fonts.ready.then(() => { Object.values(App.views).forEach(v => { v.cw = 0; }); });
+
+  buildGauge(); buildTiles();
+  App.views.ve = new TableView($('#tv-ve'), App.tables.ve);
+  App.views.ign = new TableView($('#tv-ign'), App.tables.ign);
+  App.views.afr = new TableView($('#tv-afr'), App.tables.afr);
+  TABLE_KEYS.forEach(k => App.views[k].refresh(true));
+  $$('[data-fuel]').forEach(b => b.addEventListener('click', () => {
+    App.fuelView = b.dataset.fuel;
+    $$('[data-fuel]').forEach(x => x.classList.toggle('on', x === b));
+    $('#tv-ve').hidden = App.fuelView !== 've'; $('#tv-afr').hidden = App.fuelView !== 'afr';
+    const fv = App.views[App.fuelView]; fv.cw = 0; fv.refresh(); placeSim(); renderLive();
+  }));
+  wizInit();
+  renderInfo(); renderLog();
+
+  $$('.tab').forEach(t => t.addEventListener('click', () => { if (location.hash !== '#' + t.dataset.view) location.hash = t.dataset.view; else show(t.dataset.view); }));
+  $('#statusPill').addEventListener('click', () => { location.hash = 'conexion'; });
+  $('#burnBtn').addEventListener('click', burnAll);
+  $$('[data-connect]').forEach(b => b.addEventListener('click', () => connect(b.dataset.connect)));
+  $('#disconnectBtn').addEventListener('click', () => disconnect());
+  $('#resetSim').addEventListener('click', async () => {
+    VECU.resetToBase(true);
+    log('Mapa base de la ECU virtual restaurado', 'ok');
+    if (App.mode === 'virtual') await connect('virtual');
+    toast('Se restauró el mapa base de la ECU virtual');
+  });
+  $('#engineBtn').addEventListener('click', () => {
+    const s = VECU.s;
+    if (s.running || s.crankT > 0) VECU.stop(); else VECU.start();
+    updateSimUI();
+  });
+  $('#tpsSlider').addEventListener('input', e => { VECU.s.driver = null; VECU.s.tpsTarget = +e.target.value; updateSimUI(); });
+  $$('[data-scn]').forEach(b => b.addEventListener('click', () => {
+    const s = VECU.s, k = b.dataset.scn;
+    if (!s.running && s.crankT <= 0) VECU.start();
+    if (k === 'auto') { s.driver = s.driver === 'auto' ? null : 'auto'; s.drvNext = s.time + 1.5; }
+    else { s.driver = null; s.tpsTarget = SCN[k]; }
+    updateSimUI();
+  }));
+  $('#autoTune').addEventListener('change', e => setAutotune(e.target.checked));
+  $('#verifyBtn').addEventListener('click', verifyTables);
+  $('#logBtn').addEventListener('click', toggleRec);
+  $('#logClear').addEventListener('click', () => { App.log.rows = []; renderLog(); });
+  $('#logCopy').addEventListener('click', () => {
+    const csv = toCSV();
+    if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(csv).then(() => toast(`CSV copiado: ${App.log.rows.length} filas`), () => toast('El navegador no dejó copiar. Probá desde el archivo local.'));
+    else toast('El navegador no dejó copiar. Probá desde el archivo local.');
+  });
+  if (!inFrame) {
+    const dl = $('#logDownload'); dl.hidden = false;
+    dl.addEventListener('click', () => {
+      const url = URL.createObjectURL(new Blob([toCSV()], { type: 'text/csv' })), a = document.createElement('a');
+      a.href = url; a.download = `chispa-registro-${new Date().toISOString().slice(0, 16).replace(/[:T]/g, '-')}.csv`; a.click();
+      setTimeout(() => URL.revokeObjectURL(url), 2000);
+    });
+  }
+  if (inFrame) connNote('En esta vista el navegador bloquea USB y Bluetooth, así que solo anda la ECU virtual. Para una ECU real, abrí Chispa desde https://ssheitt8.github.io/chispa-efi/ en Chrome o Edge, en la computadora o en Android.');
+
+  window.addEventListener('hashchange', route);
+  route();
+  log('Chispa lista. Protocolo: Speeduino msEnvelope (largo + datos + CRC32).');
+  // arranque en estado de trabajo: ECU virtual con el motor en marcha
+  connect('virtual').then(() => { VECU.start(); VECU.s.driver = 'auto'; VECU.s.drvNext = VECU.s.time + 3; updateSimUI(); });
+}
+init();
+})();
+</script>
+<script src="pwa.js"></script>
+</body>
+</html>

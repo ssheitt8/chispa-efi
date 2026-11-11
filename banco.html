@@ -1,0 +1,548 @@
+<title>Banco de pruebas Chispa</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<style>
+:root{
+  /* Layout: one reading column for a bench build guide; the wiring diagram and pin table get a wide card that scrolls sideways on phones. Same identity as the Chispa app. */
+  --bg:#0D1116;
+  --surface:#141A21;
+  --surface-2:#1C242D;
+  --line:#2A3440;
+  --fg:#E6EBF0;
+  --muted:#8C99A7;
+  --accent:#F2A93B;
+  --accent-ink:#1C1305;
+  --ok:#45C281;
+  --warn:#F0913A;
+  --bad:#EF5B53;
+  --rich:#5DA9F6;
+  --font-display:"Chakra Petch","Bahnschrift","DIN Alternate",system-ui,sans-serif;
+  --font-body:"IBM Plex Sans",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  --font-mono:"IBM Plex Mono",ui-monospace,"Cascadia Mono",Consolas,monospace;
+  color-scheme:dark;
+}
+@media (prefers-color-scheme: light){
+  :root:not([data-theme="dark"]){
+    --bg:#EEF1F4;--surface:#FFFFFF;--surface-2:#E7ECF1;--line:#D3DBE3;--fg:#121920;--muted:#596673;
+    --accent:#B26700;--accent-ink:#FFFFFF;--ok:#1B8A52;--warn:#BB5C0B;--bad:#C93A32;--rich:#1E6CC0;
+    color-scheme:light;
+  }
+}
+:root[data-theme="light"]{
+  --bg:#EEF1F4;--surface:#FFFFFF;--surface-2:#E7ECF1;--line:#D3DBE3;--fg:#121920;--muted:#596673;
+  --accent:#B26700;--accent-ink:#FFFFFF;--ok:#1B8A52;--warn:#BB5C0B;--bad:#C93A32;--rich:#1E6CC0;
+  color-scheme:light;
+}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+body{margin:0;background:var(--bg);color:var(--fg);font:16px/1.55 var(--font-body);-webkit-font-smoothing:antialiased}
+a{color:var(--accent);text-underline-offset:3px}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+h1,h2,h3{font-family:var(--font-display);font-weight:600;margin:0;text-wrap:balance;letter-spacing:.01em}
+h1{font-size:clamp(34px,6vw,52px);line-height:1.05;font-weight:700}
+h2{font-size:26px;line-height:1.2}
+h3{font-size:17px}
+p{margin:0}
+code,kbd{font-family:var(--font-mono);font-size:.9em;background:var(--surface-2);border:1px solid var(--line);border-radius:5px;padding:1px 5px}
+.wrap{max-width:980px;margin:0 auto;padding-block:28px 64px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));display:flex;flex-direction:column;gap:44px}
+section{display:flex;flex-direction:column;gap:16px;min-width:0}
+.lead{font-size:18px;color:var(--muted);max-width:62ch}
+.eyebrow{font:600 12px var(--font-mono);letter-spacing:.14em;text-transform:uppercase;color:var(--accent)}
+.hero{display:flex;flex-direction:column;gap:16px}
+.facts{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px;margin-top:6px}
+.fact{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:10px 14px}
+.fact b{display:block;font:600 22px var(--font-display);font-variant-numeric:tabular-nums}
+.fact span{font-size:13px;color:var(--muted)}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:18px;min-width:0}
+.note{font-size:14px;color:var(--muted);max-width:70ch}
+.warnbox{border:1px solid color-mix(in srgb,var(--warn) 45%,transparent);background:color-mix(in srgb,var(--warn) 9%,var(--surface));border-radius:10px;padding:12px 16px;font-size:15px;max-width:75ch}
+.warnbox b{color:var(--warn)}
+
+/* lists with checkboxes */
+.checks{list-style:none;margin:0;padding:0;display:flex;flex-direction:column}
+.checks li{display:grid;grid-template-columns:26px minmax(0,1fr) auto;gap:4px 12px;align-items:start;padding:12px 4px;border-bottom:1px solid var(--line)}
+.checks li:last-child{border-bottom:0}
+.checks input{appearance:none;-webkit-appearance:none;width:20px;height:20px;border:2px solid var(--muted);border-radius:5px;margin:2px 0 0;cursor:pointer;display:grid;place-items:center}
+.checks input:checked{background:var(--ok);border-color:var(--ok)}
+.checks input:checked::after{content:"";width:5px;height:10px;border:solid var(--bg);border-width:0 2.5px 2.5px 0;transform:rotate(45deg) translate(-1px,-1px)}
+.checks label{cursor:pointer;font-weight:500}
+.checks li.done label{color:var(--muted);text-decoration:line-through;text-decoration-color:var(--line)}
+.checks small{grid-column:2;color:var(--muted);font-size:14px}
+.checks .qty{font:500 14px var(--font-mono);color:var(--muted);text-align:right;white-space:nowrap;font-variant-numeric:tabular-nums}
+.total{display:flex;justify-content:space-between;align-items:baseline;gap:12px;flex-wrap:wrap;padding:12px 4px 0;border-top:1px solid var(--line);margin-top:4px}
+.total b{font:600 20px var(--font-display)}
+.progress{font:500 13px var(--font-mono);color:var(--muted)}
+
+/* software list */
+.soft{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px}
+.soft .card{display:flex;flex-direction:column;gap:6px;padding:14px 16px}
+.soft p{font-size:14px;color:var(--muted)}
+
+/* diagram */
+.diagram{overflow-x:auto;-webkit-overflow-scrolling:touch;border-radius:12px;border:1px solid var(--line);background:var(--surface)}
+.diagram svg{display:block;width:100%;min-width:760px;height:auto}
+.d-board{fill:var(--surface-2);stroke:var(--line);stroke-width:1.5}
+.d-pc{fill:var(--bg);stroke:var(--line);stroke-width:1.5}
+.d-title{fill:var(--fg);font:600 15px var(--font-display)}
+.d-sub{fill:var(--muted);font:500 11.5px var(--font-mono)}
+.d-pin{fill:var(--fg);font:500 12px var(--font-mono)}
+.d-lab{fill:var(--muted);font:500 11px var(--font-mono)}
+.d-fn{fill:var(--fg);font:600 12px var(--font-body)}
+.d-sig{stroke:var(--accent);stroke-width:2.2;fill:none}
+.d-gnd{stroke:var(--muted);stroke-width:2;fill:none}
+.d-pwr{stroke:var(--bad);stroke-width:2;fill:none}
+.d-usb{stroke:var(--muted);stroke-width:1.6;fill:none;stroke-dasharray:5 4}
+.d-out{stroke:var(--rich);stroke-width:2;fill:none}
+.d-res{fill:var(--surface);stroke:var(--fg);stroke-width:1.4}
+.d-pot{fill:var(--surface);stroke:var(--fg);stroke-width:1.4}
+.d-arrow{fill:var(--accent)}
+.d-dot{fill:var(--fg)}
+.led-inj{fill:var(--rich)}.led-ign{fill:var(--accent)}.led-rel{fill:var(--ok)}
+.d-ledbar{stroke:var(--fg);stroke-width:2}
+.legend{display:flex;flex-wrap:wrap;gap:8px 18px;font-size:13px;color:var(--muted)}
+.legend i{display:inline-block;width:18px;height:3px;border-radius:2px;vertical-align:middle;margin-right:7px}
+.legend .dot{width:10px;height:10px;border-radius:50%}
+
+/* tables */
+.tbl{overflow-x:auto;border:1px solid var(--line);border-radius:12px;background:var(--surface)}
+table{border-collapse:collapse;width:100%;min-width:620px;font-size:14.5px}
+th,td{text-align:left;padding:10px 14px;border-bottom:1px solid var(--line);vertical-align:top}
+tr:last-child td{border-bottom:0}
+th{font:600 11.5px var(--font-mono);letter-spacing:.08em;text-transform:uppercase;color:var(--muted);background:var(--surface-2)}
+td.pin{font:600 14px var(--font-mono);white-space:nowrap;font-variant-numeric:tabular-nums}
+td .tag{display:inline-block;font:600 11px var(--font-mono);padding:1px 7px;border-radius:999px;border:1px solid var(--line);color:var(--muted);margin-left:6px}
+tr.grp td{background:color-mix(in srgb,var(--surface-2) 60%,transparent);font:600 12px var(--font-mono);letter-spacing:.08em;text-transform:uppercase;color:var(--accent)}
+
+/* steps */
+.steps{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:14px;counter-reset:s}
+.steps>li{counter-increment:s;display:grid;grid-template-columns:44px minmax(0,1fr);gap:14px}
+.steps>li::before{content:counter(s);font:700 20px/44px var(--font-display);text-align:center;width:44px;height:44px;border-radius:10px;background:var(--surface-2);border:1px solid var(--line);color:var(--accent)}
+.steps h3{margin:9px 0 6px}
+.steps p,.steps ul{color:var(--muted);font-size:15px;max-width:68ch}
+.steps ul{margin:6px 0 0;padding-left:18px;display:flex;flex-direction:column;gap:4px}
+.steps strong{color:var(--fg);font-weight:600}
+
+/* troubleshooting */
+.faq{display:flex;flex-direction:column;gap:10px}
+.faq details{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:0 16px}
+.faq summary{cursor:pointer;padding:13px 0;font-weight:600;list-style:none;display:flex;justify-content:space-between;gap:12px}
+.faq summary::-webkit-details-marker{display:none}
+.faq summary::after{content:"+";font:600 18px/1 var(--font-mono);color:var(--muted)}
+.faq details[open] summary::after{content:"−"}
+.faq ul{margin:0 0 14px;padding-left:18px;color:var(--muted);font-size:15px;display:flex;flex-direction:column;gap:4px}
+.next{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:12px}
+.next .card p{color:var(--muted);font-size:14.5px;margin-top:6px}
+footer{font-size:13px;color:var(--muted);border-top:1px solid var(--line);padding-top:16px}
+@media (prefers-reduced-motion: reduce){*{transition:none!important;animation:none!important}}
+</style>
+
+<div class="wrap">
+  <header class="hero">
+    <span class="eyebrow">Chispa EFI · fase 1</span>
+    <h1>Banco de pruebas</h1>
+    <p class="lead">Una ECU Speeduino de verdad sobre la mesa, con un motor simulado, manejada desde Chispa. Todo funciona con los 5 V del USB: sin batería de 12 V, sin inyectores reales y sin motor.</p>
+    <div class="facts">
+      <div class="fact"><b>US$31–45</b><span>en componentes</span></div>
+      <div class="fact"><b>2–3 h</b><span>armado y configuración</span></div>
+      <div class="fact"><b>5 V USB</b><span>sin riesgo eléctrico</span></div>
+      <div class="fact"><b>202501</b><span>versión de Speeduino</span></div>
+    </div>
+  </header>
+
+  <section id="compras">
+    <h2>Qué comprar</h2>
+    <p class="note">Precios aproximados de clones genéricos. Marcá lo que ya tenés: se guarda en este navegador.</p>
+    <div class="card">
+      <ul class="checks" data-group="buy">
+        <li><input type="checkbox" id="b-mega"><label for="b-mega">Arduino Mega 2560</label><span class="qty">1 · US$15–20</span><small>Es la ECU: corre el firmware Speeduino. Sirve un clon con chip USB CH340.</small></li>
+        <li><input type="checkbox" id="b-nano"><label for="b-nano">Arduino Nano</label><span class="qty">1 · US$4–6</span><small>Simula la rueda del cigüeñal con Ardu-Stim. La app de Ardu-Stim solo carga el firmware sola en un Nano.</small></li>
+        <li><input type="checkbox" id="b-proto"><label for="b-proto">Protoboard de 830 puntos</label><span class="qty">1 · US$3–5</span><small>Usá las filas + y − como rieles de 5 V y masa.</small></li>
+        <li><input type="checkbox" id="b-dupont"><label for="b-dupont">Cables dupont macho-macho</label><span class="qty">40 · US$2–3</span></li>
+        <li><input type="checkbox" id="b-pots"><label for="b-pots">Potenciómetros lineales de 10 kΩ</label><span class="qty">7 · US$2–4</span><small>Seis hacen de sensores (IAT, CLT, TPS, MAP, batería y sonda O2) y uno marca las RPM.</small></li>
+        <li><input type="checkbox" id="b-leds"><label for="b-leds">LEDs de 5 mm: 4 azules, 4 amarillos y 2 verdes</label><span class="qty">10 · US$1</span><small>Azul para inyectores, amarillo para bobinas, verde para bomba y ventilador.</small></li>
+        <li><input type="checkbox" id="b-res"><label for="b-res">Resistencias de 330 Ω</label><span class="qty">10 · US$1</span><small>Una en serie con cada LED. Limita la corriente a unos 9 mA, bien por debajo de los 20 mA que aguanta un pin.</small></li>
+        <li><input type="checkbox" id="b-usb"><label for="b-usb">Cables USB con datos</label><span class="qty">2 · US$3–5</span><small>Tipo B para el Mega, y el que use tu Nano (mini-USB o USB-C). Los cables "solo carga" no sirven.</small></li>
+      </ul>
+      <div class="total"><span class="progress" id="buyProgress">0 de 8 listos</span><span>Total estimado <b>US$31–45</b></span></div>
+    </div>
+    <p class="note">Opcionales para más realismo: 2 sensores de temperatura NTC tipo GM con 2 resistencias de 2.49 kΩ, y un sensor MAP MPX4250AP. Para la fase siguiente vas a necesitar la placa Speeduino v0.4 y una fuente de 12 V.</p>
+  </section>
+
+  <section id="programas">
+    <h2>Programas</h2>
+    <div class="soft">
+      <div class="card"><h3>SpeedyLoader</h3><p>Carga el firmware Speeduino ya compilado en el Mega.</p><a href="https://github.com/speeduino/SpeedyLoader/releases" target="_blank" rel="noopener">Descargar</a></div>
+      <div class="card"><h3>TunerStudio MS</h3><p>Para la configuración inicial. La versión Lite es gratis.</p><a href="https://www.tunerstudio.com/index.php/downloads" target="_blank" rel="noopener">Descargar</a></div>
+      <div class="card"><h3>Ardu-Stim</h3><p>App y firmware que convierten el Nano en un simulador de cigüeñal y levas.</p><a href="https://github.com/speeduino/Ardu-Stim/releases" target="_blank" rel="noopener">Descargar</a></div>
+      <div class="card"><h3>Firmware e INI</h3><p>Bajá el <code>speeduino.ini</code> de la misma versión que cargues. Está en la carpeta <code>reference</code> del release.</p><a href="https://github.com/speeduino/speeduino/releases" target="_blank" rel="noopener">Releases de Speeduino</a></div>
+    </div>
+  </section>
+
+  <section id="conexiones">
+    <h2>Conexiones</h2>
+    <p class="note">Los pines son los de la placa Speeduino v0.4, que es la distribución por defecto del firmware en el Mega. Así, cuando más adelante pongas la placa real, no cambia nada. En celular deslizá el diagrama hacia los costados.</p>
+    <div class="diagram" role="img" aria-label="Diagrama de conexiones: el Nano con Ardu-Stim manda la señal de cigüeñal al pin 19 del Mega y la de levas al 18. Seis potenciómetros van a A0, A1, A2, A3, A4 y A8. Diez LEDs con resistencia de 330 ohm salen de los pines 8, 9, 10, 11, 40, 38, 52, 50, 45 y 47.">
+      <svg viewBox="0 0 1000 640" xmlns="http://www.w3.org/2000/svg">
+        <!-- PC -->
+        <rect class="d-pc" x="360" y="10" width="280" height="46" rx="8"/>
+        <text class="d-title" x="500" y="32" text-anchor="middle">PC</text>
+        <text class="d-sub" x="500" y="48" text-anchor="middle">TunerStudio · Chispa en Chrome/Edge</text>
+        <path class="d-usb" d="M500 56 V110"/>
+        <text class="d-lab" x="508" y="88">USB 115200</text>
+        <path class="d-usb" d="M120 170 V33 H360"/>
+        <text class="d-lab" x="128" y="110">USB</text>
+
+        <!-- Nano -->
+        <rect class="d-board" x="30" y="170" width="180" height="170" rx="10"/>
+        <text class="d-title" x="46" y="196">Arduino Nano</text>
+        <text class="d-sub" x="46" y="214">Ardu-Stim · rueda 36-1</text>
+        <text class="d-pin" x="198" y="254" text-anchor="end">D8</text>
+        <text class="d-pin" x="198" y="284" text-anchor="end">D9</text>
+        <text class="d-pin" x="198" y="314" text-anchor="end">GND</text>
+        <text class="d-pin" x="120" y="330" text-anchor="middle">A0</text>
+
+        <!-- Nano -> Mega -->
+        <path class="d-sig" d="M210 250 H330"/><text class="d-lab" x="270" y="242" text-anchor="middle">cigüeñal</text>
+        <path class="d-sig" d="M210 280 H330"/><text class="d-lab" x="270" y="272" text-anchor="middle">levas</text>
+        <path class="d-gnd" d="M210 310 H330"/><text class="d-lab" x="270" y="302" text-anchor="middle">masa común</text>
+        <circle class="d-dot" cx="210" cy="250" r="3.5"/><circle class="d-dot" cx="330" cy="250" r="3.5"/>
+        <circle class="d-dot" cx="210" cy="280" r="3.5"/><circle class="d-dot" cx="330" cy="280" r="3.5"/>
+        <circle class="d-dot" cx="210" cy="310" r="3.5"/><circle class="d-dot" cx="330" cy="310" r="3.5"/>
+
+        <!-- RPM pot under Nano -->
+        <path class="d-sig" d="M120 340 V376"/>
+        <polygon class="d-arrow" points="114,376 126,376 120,385"/>
+        <rect class="d-pot" x="100" y="387" width="40" height="16" rx="2"/>
+        <path class="d-gnd" d="M100 395 H86 M140 395 H154"/>
+        <text class="d-pin" x="80" y="399" text-anchor="end">+</text>
+        <text class="d-pin" x="160" y="399">−</text>
+        <text class="d-fn" x="120" y="426" text-anchor="middle">RPM (opcional)</text>
+
+        <!-- Mega -->
+        <rect class="d-board" x="330" y="110" width="360" height="360" rx="10"/>
+        <text class="d-title" x="350" y="140">Arduino Mega 2560</text>
+        <text class="d-sub" x="350" y="158">Speeduino · pines de placa v0.4</text>
+        <text class="d-pin" x="342" y="254">D19</text>
+        <text class="d-pin" x="342" y="284">D18</text>
+        <text class="d-pin" x="342" y="314">GND</text>
+
+        <!-- outputs -->
+        <text class="d-lab" x="770" y="170" text-anchor="middle">330 Ω</text>
+        <text class="d-lab" x="812" y="170" text-anchor="middle">LED</text>
+        <g id="outs"></g>
+
+        <!-- inputs at bottom -->
+        <g id="ins"></g>
+        <text class="d-lab" x="500" y="632" text-anchor="middle">Cada potenciómetro: un extremo al riel + (5V), el otro al riel − (GND) y el cursor (flecha) al pin analógico.</text>
+
+        <!-- legend -->
+        <g transform="translate(748,500)">
+          <path class="d-sig" d="M0 0 H24"/><text class="d-lab" x="32" y="4">señal de entrada</text>
+          <path class="d-out" d="M0 22 H24"/><text class="d-lab" x="32" y="26">salida a LED</text>
+          <path class="d-gnd" d="M0 44 H24"/><text class="d-lab" x="32" y="48">masa (GND)</text>
+          <path class="d-pwr" d="M0 66 H24"/><text class="d-lab" x="32" y="70">5 V</text>
+          <path class="d-usb" d="M0 88 H24"/><text class="d-lab" x="32" y="92">cable USB</text>
+        </g>
+      </svg>
+    </div>
+    <div class="legend"><span><i class="dot led-inj" style="background:var(--rich)"></i>inyectores</span><span><i class="dot" style="background:var(--accent)"></i>bobinas</span><span><i class="dot" style="background:var(--ok)"></i>bomba y ventilador</span></div>
+
+    <div class="tbl">
+      <table>
+        <thead><tr><th>Función</th><th>Pin del Mega</th><th>Conectar a</th><th>Qué ver</th></tr></thead>
+        <tbody>
+          <tr class="grp"><td colspan="4">Entradas</td></tr>
+          <tr><td>Cigüeñal (disparo primario)</td><td class="pin">D19</td><td>Nano D8</td><td>RPM y sincronía</td></tr>
+          <tr><td>Levas (disparo secundario)</td><td class="pin">D18</td><td>Nano D9</td><td>Opcional con chispa perdida</td></tr>
+          <tr><td>Temperatura de aire (IAT)</td><td class="pin">A0</td><td>Cursor del pote 1</td><td>Voltaje bajo = caliente</td></tr>
+          <tr><td>Temperatura de motor (CLT)</td><td class="pin">A1</td><td>Cursor del pote 2</td><td>Voltaje bajo = caliente</td></tr>
+          <tr><td>Acelerador (TPS)</td><td class="pin">A2</td><td>Cursor del pote 3</td><td>0–100 % después de calibrar</td></tr>
+          <tr><td>Presión de admisión (MAP)</td><td class="pin">A3</td><td>Cursor del pote 4</td><td>Mueve el punto rojo de la tabla</td></tr>
+          <tr><td>Batería</td><td class="pin">A4</td><td>Cursor del pote 5</td><td>0–5 V se lee como 0–24.5 V. Unos 2.8 V dan 13.7 V.</td></tr>
+          <tr><td>Sonda O2 / wideband</td><td class="pin">A8</td><td>Cursor del pote 6</td><td>0–5 V = AFR 10–20</td></tr>
+          <tr><td>5 V y masa</td><td class="pin">5V · GND</td><td>Rieles + y − de la protoboard</td><td>Extremos de todos los potes</td></tr>
+          <tr class="grp"><td colspan="4">Salidas (LED + 330 Ω a masa)</td></tr>
+          <tr><td>Inyectores 1 a 4</td><td class="pin">D8 · D9 · D10 · D11</td><td>LEDs azules</td><td>Parpadeo = pulso de inyección</td></tr>
+          <tr><td>Bobinas 1 a 4</td><td class="pin">D40 · D38 · D52 · D50</td><td>LEDs amarillos</td><td>Encendido = carga de bobina</td></tr>
+          <tr><td>Bomba de combustible</td><td class="pin">D45</td><td>LED verde</td><td>Se prende unos segundos al conectar (cebado)</td></tr>
+          <tr><td>Ventilador</td><td class="pin">D47</td><td>LED verde</td><td>Se prende al subir el pote de CLT</td></tr>
+          <tr class="grp"><td colspan="4">Nano (Ardu-Stim)</td></tr>
+          <tr><td>RPM manual <span class="tag">opcional</span></td><td class="pin">Nano A0</td><td>Cursor del pote 7</td><td>Con el modo de RPM por potenciómetro</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="warnbox"><b>Ojo:</b> los pines del Arduino solo dan unos 20 mA. Sirven para LEDs, nunca para un inyector, una bobina o un relé reales. Para eso está la placa Speeduino, con sus transistores de potencia.</div>
+  </section>
+
+  <section id="pasos">
+    <h2>Paso a paso</h2>
+    <ol class="steps">
+      <li><div><h3>Instalá los programas</h3><p>SpeedyLoader, TunerStudio MS y Ardu-Stim. Si Windows no reconoce tu clon, instalá el driver del chip <strong>CH340</strong>.</p></div></li>
+      <li><div><h3>Cargá Speeduino en el Mega</h3><p>Conectá solo el Mega. En SpeedyLoader elegí su puerto COM y la versión estable más nueva (<strong>202501</strong>), y tocá Flash. Bajá también el <code>speeduino.ini</code> de esa misma versión.</p></div></li>
+      <li><div><h3>Convertí el Nano en Ardu-Stim</h3><p>Abrí la app de Ardu-Stim con el Nano conectado y dejá que suba el firmware. Elegí la rueda <strong>36-1</strong> y un régimen fijo de 1000 rpm. Más adelante podés pasar al modo potenciómetro.</p></div></li>
+      <li><div><h3>Cableá todo desconectado</h3><p>Seguí el diagrama con los dos USB desenchufados. Revisá dos veces que nada vaya del pin 5V directo a GND.</p></div></li>
+      <li><div><h3>Configurá en TunerStudio</h3><p>Creá un proyecto nuevo con el <code>speeduino.ini</code>, conectá a 115200 y cargá los ajustes de la tabla de abajo. Tocá <strong>Burn</strong> y después desenchufá y volvé a enchufar el Mega.</p></div></li>
+      <li><div><h3>Verificá en TunerStudio</h3><p>Las RPM tienen que coincidir con Ardu-Stim, el indicador tiene que decir <strong>Full Sync</strong> y los LEDs de inyección y bobinas tienen que parpadear.</p></div></li>
+      <li><div><h3>Pasá a Chispa</h3><p>Cerrá TunerStudio para liberar el puerto COM. Después:</p>
+        <ul>
+          <li>Abrí <a href="https://ssheitt8.github.io/chispa-efi/" target="_blank" rel="noopener">ssheitt8.github.io/chispa-efi</a> en Chrome o Edge.</li>
+          <li>Sin internet: en la carpeta de Chispa corré <code>powershell -NoProfile -ExecutionPolicy Bypass -File servir.ps1</code> y abrí <code>http://localhost:8765</code>.</li>
+          <li>Andá a <strong>Conexión → USB</strong> y elegí el COM del Mega.</li>
+        </ul></div></li>
+    </ol>
+  </section>
+
+  <section id="tunerstudio">
+    <h2>Ajustes de TunerStudio para el banco</h2>
+    <p class="note">Los nombres de los menús pueden variar un poco según la versión de TunerStudio y del INI.</p>
+    <div class="tbl">
+      <table>
+        <thead><tr><th>Menú</th><th>Campo</th><th>Valor</th></tr></thead>
+        <tbody>
+          <tr><td>Settings → Engine Constants</td><td>Board layout</td><td class="pin">v0.4</td></tr>
+          <tr><td></td><td>Number of cylinders</td><td class="pin">4</td></tr>
+          <tr><td></td><td>Control algorithm</td><td class="pin">Speed Density</td></tr>
+          <tr><td></td><td>Injector layout</td><td class="pin">Paired</td></tr>
+          <tr><td></td><td>Stoichiometric ratio</td><td class="pin">14.7</td></tr>
+          <tr><td></td><td>Required fuel</td><td>Usá la calculadora con tu motor. En banco cualquier valor entre 6 y 12 ms sirve.</td></tr>
+          <tr><td>Decoders → Trigger setup</td><td>Trigger pattern</td><td class="pin">Missing Tooth</td></tr>
+          <tr><td></td><td>Primary base teeth · Missing teeth</td><td class="pin">36 · 1</td></tr>
+          <tr><td></td><td>Primary trigger edge</td><td class="pin">Rising</td></tr>
+          <tr><td>Spark → Spark settings</td><td>Spark mode</td><td class="pin">Wasted Spark</td></tr>
+          <tr><td></td><td>Spark output triggers</td><td><span class="pin" style="font-family:var(--font-mono);font-weight:600">Going High</span> para ver el LED prendido mientras carga la bobina. Con bobinas reales este valor depende de la bobina: uno equivocado la puede quemar.</td></tr>
+          <tr><td>Tools → Calibrate TPS</td><td>Closed / WOT</td><td>Pote al mínimo y "Get current"; pote al máximo y "Get current".</td></tr>
+          <tr><td>Tools → Calibrate pressure sensors</td><td>MAP</td><td>MPX4250 (10 kPa a 0 V, 260 kPa a 5 V). Así el sensor real entra después sin cambiar nada.</td></tr>
+          <tr><td>Tools → Calibrate AFR table</td><td>Sensor</td><td>Wideband lineal: 0 V = AFR 10, 5 V = AFR 20.</td></tr>
+          <tr><td>Tools → Calibrate thermistor tables</td><td>CLT e IAT</td><td>GM, o el sensor que vayas a usar en el motor.</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="note">Con 4 cilindros en semi-secuencial y chispa perdida es normal que trabajen sobre todo los canales 1 y 2. Si los LEDs 3 y 4 no parpadean, no es una falla.</p>
+  </section>
+
+  <section id="pruebas">
+    <h2>Pruebas para dar el banco por bueno</h2>
+    <div class="card">
+      <ul class="checks" data-group="test">
+        <li><input type="checkbox" id="t-sig"><label for="t-sig">Chispa se conecta y muestra la firma <code>speeduino 202501</code></label><small>Conexión → ECU conectada → Firmware.</small></li>
+        <li><input type="checkbox" id="t-sync"><label for="t-sync">Sincronía "Completa" y 0 pérdidas de sincronía</label><small>Conexión → Diagnóstico en vivo.</small></li>
+        <li><input type="checkbox" id="t-rpm"><label for="t-rpm">Las RPM de Chispa coinciden con las de Ardu-Stim (±1 %)</label></li>
+        <li><input type="checkbox" id="t-tps"><label for="t-tps">El pote del TPS lleva el acelerador de 0 a 100 %</label></li>
+        <li><input type="checkbox" id="t-map"><label for="t-map">El pote del MAP mueve el punto rojo de la tabla VE</label><small>Subí también las RPM y mirá cómo cruza la tabla en diagonal.</small></li>
+        <li><input type="checkbox" id="t-pw"><label for="t-pw">Con más MAP, el ancho de pulso sube en el tablero</label><small>A 1000 rpm el parpadeo de los LEDs es rápido; el número de "Inyección" en ms es la referencia.</small></li>
+        <li><input type="checkbox" id="t-burn"><label for="t-burn">Una celda editada y quemada sobrevive a desenchufar el Mega</label><small>Editá, tocá Quemar, desenchufá, volvé a conectar y buscá la celda.</small></li>
+        <li><input type="checkbox" id="t-crc"><label for="t-crc">"Verificar tablas" dice que coinciden byte a byte</label></li>
+        <li><input type="checkbox" id="t-soak"><label for="t-soak">10 minutos con la rueda girando y 0 reinicios detectados</label></li>
+      </ul>
+      <div class="total"><span class="progress" id="testProgress">0 de 9 pruebas</span></div>
+    </div>
+  </section>
+
+  <section id="problemas">
+    <h2>Si algo no anda</h2>
+    <div class="faq">
+      <details><summary>Chispa dice "La ECU no respondió a tiempo"</summary><ul>
+        <li>Cerrá TunerStudio o cualquier otro programa que tenga abierto el puerto COM. Solo uno a la vez puede usarlo.</li>
+        <li>El Mega se reinicia al abrir el puerto. Chispa espera 1.5 s; si tu clon tarda más, probá Reconectar.</li>
+        <li>Confirmá que cargaste Speeduino y no otro sketch: SpeedyLoader de nuevo.</li>
+      </ul></details>
+      <details><summary>El puerto del Mega no aparece en la lista</summary><ul>
+        <li>Falta el driver CH340, o el cable es solo de carga.</li>
+        <li>Probá otro puerto USB de la PC, sin hub.</li>
+      </ul></details>
+      <details><summary>RPM en 0 o "Sin señal de cigüeñal"</summary><ul>
+        <li>Ardu-Stim no está girando: revisá en su app que la rueda esté activa.</li>
+        <li>El cable va de Nano D8 a Mega D19, y la masa común está puesta.</li>
+        <li>El patrón tiene que ser el mismo en los dos lados: 36-1.</li>
+      </ul></details>
+      <details><summary>Las pérdidas de sincronía no paran de subir</summary><ul>
+        <li>Falsos contactos en la protoboard: apretá o cambiá los cables del cigüeñal.</li>
+        <li>Cantidad de dientes o dientes faltantes distintos entre Ardu-Stim y TunerStudio.</li>
+        <li>Probá con "Primary trigger edge" en Falling.</li>
+      </ul></details>
+      <details><summary>Chispa marca reinicios detectados</summary><ul>
+        <li>El USB pierde alimentación: cable flojo, hub sin fuente o la PC suspende el puerto.</li>
+        <li>Algún LED sin resistencia está pidiendo demasiada corriente.</li>
+      </ul></details>
+      <details><summary>Las tablas se ven raras o "Verificar tablas" no coincide</summary><ul>
+        <li>El INI de TunerStudio y el firmware son de versiones distintas.</li>
+        <li>Volvé a conectar Chispa para que relea las páginas 1, 2 y 3.</li>
+      </ul></details>
+    </div>
+  </section>
+
+  <section id="bluetooth">
+    <h2>Puente Bluetooth</h2>
+    <p class="lead" style="font-size:16px">Un ESP32 se conecta al segundo puerto serial del Mega y lo pasa a Bluetooth. Chispa lo ve como "Chispa-XXXX" y afina sin cable. El USB queda libre, aunque no se pueden usar los dos al mismo tiempo.</p>
+    <div class="card">
+      <ul class="checks" data-group="ble">
+        <li><input type="checkbox" id="e-esp"><label for="e-esp">ESP32 DevKit (WROOM-32) o ESP32-C3 SuperMini</label><span class="qty">1 · US$4–6</span><small>Cualquiera de los dos sirve; el programa elige los pines solo.</small></li>
+        <li><input type="checkbox" id="e-div"><label for="e-div">Resistencias de 1 kΩ y 2 kΩ (o 2.2 kΩ)</label><span class="qty">1 + 1 · US$0.5</span><small>Bajan los 5 V que manda el Mega a 3.3 V, que es lo que aguanta el ESP32.</small></li>
+      </ul>
+    </div>
+    <div class="diagram" role="img" aria-label="Puente Bluetooth: el pin 15 del Mega recibe del GPIO17 del ESP32; el pin 14 del Mega pasa por una resistencia de 1 kiloohm al GPIO16 del ESP32, con una de 2 kiloohm a masa; 5V del Mega al VIN del ESP32 y masas unidas.">
+      <svg viewBox="0 0 760 270" xmlns="http://www.w3.org/2000/svg">
+        <rect class="d-board" x="20" y="20" width="200" height="230" rx="10"/>
+        <text class="d-title" x="36" y="46">Arduino Mega</text>
+        <text class="d-sub" x="36" y="64">Speeduino · Serial3</text>
+        <text class="d-pin" x="208" y="104" text-anchor="end">D15 · RX3</text>
+        <text class="d-pin" x="208" y="144" text-anchor="end">5V</text>
+        <text class="d-pin" x="208" y="184" text-anchor="end">D14 · TX3</text>
+        <text class="d-pin" x="208" y="229" text-anchor="end">GND</text>
+
+        <rect class="d-board" x="540" y="20" width="200" height="230" rx="10"/>
+        <text class="d-title" x="556" y="46">ESP32</text>
+        <text class="d-sub" x="556" y="64">puente-ble · Chispa-XXXX</text>
+        <text class="d-pin" x="552" y="104">GPIO17 · TX</text>
+        <text class="d-pin" x="552" y="144">VIN / 5V</text>
+        <text class="d-pin" x="552" y="184">GPIO16 · RX</text>
+        <text class="d-pin" x="552" y="229">GND</text>
+
+        <path class="d-sig" d="M220 100 H540"/>
+        <text class="d-lab" x="380" y="92" text-anchor="middle">datos al Mega · 3.3 V, entra directo</text>
+        <path class="d-pwr" d="M220 140 H540"/>
+        <text class="d-lab" x="380" y="132" text-anchor="middle">alimentación 5 V</text>
+        <path class="d-sig" d="M220 180 H290 M340 180 H540"/>
+        <rect class="d-res" x="290" y="173" width="50" height="14" rx="2"/>
+        <text class="d-lab" x="315" y="166" text-anchor="middle">1 kΩ</text>
+        <text class="d-lab" x="480" y="172" text-anchor="middle">al ESP32 · 3.3 V</text>
+        <circle class="d-dot" cx="420" cy="180" r="3.5"/>
+        <path class="d-gnd" d="M420 180 V190 M420 214 V225"/>
+        <rect class="d-res" x="413" y="190" width="14" height="24" rx="2"/>
+        <text class="d-lab" x="434" y="206">2 kΩ</text>
+        <circle class="d-dot" cx="420" cy="225" r="3.5"/>
+        <path class="d-gnd" d="M220 225 H540"/>
+        <text class="d-lab" x="300" y="217" text-anchor="middle">masa común</text>
+        <circle class="d-dot" cx="220" cy="100" r="3.5"/><circle class="d-dot" cx="540" cy="100" r="3.5"/>
+        <circle class="d-dot" cx="220" cy="140" r="3.5"/><circle class="d-dot" cx="540" cy="140" r="3.5"/>
+        <circle class="d-dot" cx="220" cy="180" r="3.5"/><circle class="d-dot" cx="540" cy="180" r="3.5"/>
+        <circle class="d-dot" cx="220" cy="225" r="3.5"/><circle class="d-dot" cx="540" cy="225" r="3.5"/>
+      </svg>
+    </div>
+    <div class="tbl">
+      <table>
+        <thead><tr><th>Mega</th><th>ESP32 DevKit</th><th>ESP32-C3</th><th>Nota</th></tr></thead>
+        <tbody>
+          <tr><td class="pin">D14 · TX3</td><td class="pin">GPIO16</td><td class="pin">GPIO4</td><td>Con divisor: 1 kΩ en serie y 2 kΩ a masa</td></tr>
+          <tr><td class="pin">D15 · RX3</td><td class="pin">GPIO17</td><td class="pin">GPIO5</td><td>Directo: el Mega lee 3.3 V como un 1</td></tr>
+          <tr><td class="pin">5V</td><td class="pin">VIN</td><td class="pin">5V</td><td>O alimentá el ESP32 por su propio USB</td></tr>
+          <tr><td class="pin">GND</td><td class="pin">GND</td><td class="pin">GND</td><td>Siempre unidas</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <ol class="steps">
+      <li><div><h3>Instalá el soporte de ESP32</h3><p>En Arduino IDE 2, andá a Preferencias y agregá esta dirección en "URLs adicionales del gestor de placas": <code>https://espressif.github.io/arduino-esp32/package_esp32_index.json</code>. Después instalá <strong>esp32 de Espressif</strong> desde el gestor de placas. Sirve la versión 2.x o la 3.x.</p></div></li>
+      <li><div><h3>Cargá el puente</h3><p>Abrí <a href="https://github.com/ssheitt8/chispa-efi/blob/main/puente-ble/puente-ble.ino" target="_blank" rel="noopener"><code>puente-ble.ino</code></a> (está en la carpeta <code>puente-ble</code> del proyecto). Elegí la placa <strong>ESP32 Dev Module</strong> o <strong>ESP32C3 Dev Module</strong>; en la C3 activá también "USB CDC On Boot". Subilo. En el monitor serie, a 115200, tiene que aparecer <code>puente Bluetooth listo como "Chispa-XXXX"</code> y el LED tiene que parpadear lento.</p></div></li>
+      <li><div><h3>Activá el segundo serial en Speeduino</h3><p>En TunerStudio, andá a <strong>Accessories → Canbus/Secondary Serial IO Interface</strong>. Poné Enable Second Serial en Enable y Second Serial protocol en <strong>Tuner Studio</strong>. Tocá Burn, reiniciá el Mega y cerrá TunerStudio.</p></div></li>
+      <li><div><h3>Cableá sin energía</h3><p>Seguí el diagrama. El divisor va únicamente en el cable que sale del pin 14 del Mega.</p></div></li>
+      <li><div><h3>Conectá desde Chispa</h3><p>Abrí Chispa en Chrome o Edge, en la computadora o en Android, desde <a href="https://ssheitt8.github.io/chispa-efi/" target="_blank" rel="noopener">ssheitt8.github.io/chispa-efi</a>. Andá a <strong>Conexión → Bluetooth</strong> y elegí "Chispa-XXXX". Cuando conecta, el LED del ESP32 queda fijo y titila con los datos.</p></div></li>
+    </ol>
+    <div class="warnbox"><b>Celular:</b> en Android abrí <a href="https://ssheitt8.github.io/chispa-efi/" target="_blank" rel="noopener">ssheitt8.github.io/chispa-efi</a> en Chrome. Desde Conexión → "Instalar Chispa como app" queda en la pantalla de inicio y abre aunque no haya internet. Chrome solo deja usar Bluetooth en páginas https o en localhost: en esta vista de Artifact y desde la red local (<code>http://192.168…</code>) está bloqueado. En iPhone no hay Bluetooth web, así que ahí hace falta la app nativa.</div>
+    <div class="card">
+      <ul class="checks" data-group="bletest">
+        <li><input type="checkbox" id="u-list"><label for="u-list">"Chispa-XXXX" aparece en la lista de Bluetooth de Chispa</label></li>
+        <li><input type="checkbox" id="u-sig"><label for="u-sig">Conecta y muestra la firma <code>speeduino 202501</code></label></li>
+        <li><input type="checkbox" id="u-rate"><label for="u-rate">Las lecturas por segundo son estables y no suben los errores de lectura</label><small>Por Bluetooth van a ser menos que por USB. Anotá cuántas te da: con eso ajustamos el puente.</small></li>
+        <li><input type="checkbox" id="u-crc"><label for="u-crc">"Verificar tablas" coincide después de editar y quemar por Bluetooth</label></li>
+        <li><input type="checkbox" id="u-recon"><label for="u-recon">Desconectás, reconectás y vuelve a andar sin reiniciar nada</label></li>
+      </ul>
+    </div>
+    <div class="faq">
+      <details><summary>"Chispa-XXXX" no aparece en la lista</summary><ul>
+        <li>Mirá el monitor serie: si no dice "listo", el programa no arrancó.</li>
+        <li>Si otra pestaña o el celular ya está conectado al puente, este deja de anunciarse. Desconectá el otro.</li>
+        <li>En Android, Chrome necesita el permiso de Dispositivos cercanos (o Ubicación en versiones viejas).</li>
+      </ul></details>
+      <details><summary>Conecta pero "La ECU no respondió a tiempo"</summary><ul>
+        <li>TX y RX cruzados: el pin 14 del Mega va al RX del ESP32, y el 15 al TX.</li>
+        <li>El segundo serial no está activado con el protocolo Tuner Studio, o faltó Burn y reiniciar.</li>
+        <li>TunerStudio o Chispa siguen conectados por USB al mismo tiempo.</li>
+        <li>En el monitor serie, "bytes al Mega" sube pero "bytes al celular" no: el Mega no está contestando por Serial3.</li>
+      </ul></details>
+      <details><summary>Se corta seguido</summary><ul>
+        <li>Alimentá el ESP32 por su propio USB: en algunas placas el pico de consumo del Bluetooth tira abajo los 5 V.</li>
+        <li>Acercá la computadora o el celular a menos de 5 m para la primera prueba.</li>
+      </ul></details>
+    </div>
+  </section>
+
+  <section id="despues">
+    <h2>Después del banco</h2>
+    <div class="next">
+      <div class="card"><h3>Fase 1b: placa Speeduino v0.4</h3><p>Montá el Mega en la placa, alimentala con 12 V de fuente de laboratorio y probá un inyector real con una luz de prueba (noid light) antes que con combustible.</p></div>
+      <div class="card"><h3>Sensores reales</h3><p>Cambiá los potes por un TPS, un MPX4250AP y dos NTC GM. Calibrá en TunerStudio y comparalos con un tester.</p></div>
+      <div class="card"><h3>Primer motor</h3><p>Un motor chico y simple (moto, kart o generador) con rueda 36-1 o 12-1. Arrancá con el mapa base, wideband instalada y extintor a mano.</p></div>
+    </div>
+  </section>
+
+  <footer>Pines tomados del código de Speeduino (<code>src/pins/pinMapping.cpp</code>, mapa de placa v0.4) y del manual de Ardu-Stim. Chispa es un prototipo propio; Speeduino, TunerStudio y Ardu-Stim pertenecen a sus autores.</footer>
+</div>
+
+<script>
+(() => {
+  const NS = 'http://www.w3.org/2000/svg';
+  const el = (tag, attrs, text) => { const n = document.createElementNS(NS, tag); for (const k in attrs) n.setAttribute(k, attrs[k]); if (text != null) n.textContent = text; return n; };
+  // salidas: pin, nombre, tipo de LED
+  const outs = [['D8', 'Iny 1', 'inj'], ['D9', 'Iny 2', 'inj'], ['D10', 'Iny 3', 'inj'], ['D11', 'Iny 4', 'inj'],
+    ['D40', 'Bob 1', 'ign'], ['D38', 'Bob 2', 'ign'], ['D52', 'Bob 3', 'ign'], ['D50', 'Bob 4', 'ign'], ['D45', 'Bomba', 'rel'], ['D47', 'Ventilador', 'rel']];
+  const go = document.getElementById('outs');
+  outs.forEach(([pin, name, kind], i) => {
+    const y = 186 + i * 27;
+    go.appendChild(el('text', { class: 'd-fn', x: 600, y: y + 4, 'text-anchor': 'end' }, name));
+    go.appendChild(el('text', { class: 'd-pin', x: 680, y: y + 4, 'text-anchor': 'end' }, pin));
+    go.appendChild(el('path', { class: 'd-out', d: `M690 ${y} H750 M790 ${y} H804 M820 ${y} H846` }));
+    go.appendChild(el('circle', { class: 'd-dot', cx: 690, cy: y, r: 3.5 }));
+    go.appendChild(el('rect', { class: 'd-res', x: 750, y: y - 6, width: 40, height: 12, rx: 2 }));
+    go.appendChild(el('polygon', { class: 'led-' + kind, points: `804,${y - 8} 804,${y + 8} 818,${y}` }));
+    go.appendChild(el('path', { class: 'd-ledbar', d: `M819 ${y - 8} V${y + 8}` }));
+    go.appendChild(el('text', { class: 'd-lab', x: 852, y: y + 4 }, 'GND'));
+  });
+  // entradas analógicas abajo del Mega
+  const ins = [['A0', 'IAT'], ['A1', 'CLT'], ['A2', 'TPS'], ['A3', 'MAP'], ['A4', 'Batería'], ['A8', 'O2']];
+  const gi = document.getElementById('ins');
+  ins.forEach(([pin, fn], i) => {
+    const x = 356 + i * 50;
+    gi.appendChild(el('text', { class: 'd-pin', x, y: 458, 'text-anchor': 'middle' }, pin));
+    gi.appendChild(el('circle', { class: 'd-dot', cx: x, cy: 470, r: 3.5 }));
+    gi.appendChild(el('path', { class: 'd-sig', d: `M${x} 470 V522` }));
+    gi.appendChild(el('polygon', { class: 'd-arrow', points: `${x - 6},522 ${x + 6},522 ${x},531` }));
+    gi.appendChild(el('rect', { class: 'd-pot', x: x - 18, y: 533, width: 36, height: 16, rx: 2 }));
+    gi.appendChild(el('path', { class: 'd-gnd', d: `M${x - 18} 541 h-4 v22 M${x + 18} 541 h4 v22` }));
+    gi.appendChild(el('text', { class: 'd-pin', x: x - 22, y: 578, 'text-anchor': 'middle' }, '+'));
+    gi.appendChild(el('text', { class: 'd-pin', x: x + 22, y: 578, 'text-anchor': 'middle' }, '−'));
+    gi.appendChild(el('text', { class: 'd-fn', x, y: 600, 'text-anchor': 'middle' }, fn));
+  });
+  [['5V', 'd-pwr', 'riel +', 652, 'end', -4], ['GND', 'd-gnd', 'riel −', 680, 'start', 4]].forEach(([pin, cls, rail, x, anchor, dx]) => {
+    gi.appendChild(el('text', { class: 'd-pin', x, y: 458, 'text-anchor': 'middle' }, pin));
+    gi.appendChild(el('circle', { class: 'd-dot', cx: x, cy: 470, r: 3.5 }));
+    gi.appendChild(el('path', { class: cls, d: `M${x} 470 V612` }));
+    gi.appendChild(el('text', { class: 'd-lab', x: x + dx, y: 616, 'text-anchor': anchor }, rail));
+  });
+
+  // checklists guardadas en este navegador
+  const KEY = 'chispa.banco.v1';
+  let saved = {};
+  try { saved = JSON.parse(localStorage.getItem(KEY) || '{}') || {}; } catch (e) { saved = {}; }
+  const groups = { buy: ['buyProgress', n => `${n.done} de ${n.all} listos`], test: ['testProgress', n => `${n.done} de ${n.all} pruebas`] };
+  function refresh() {
+    document.querySelectorAll('.checks').forEach(ul => {
+      const boxes = ul.querySelectorAll('input[type=checkbox]');
+      let done = 0;
+      boxes.forEach(b => { b.closest('li').classList.toggle('done', b.checked); if (b.checked) done++; });
+      const g = groups[ul.dataset.group];
+      if (g) document.getElementById(g[0]).textContent = g[1]({ done, all: boxes.length });
+    });
+  }
+  document.querySelectorAll('.checks input[type=checkbox]').forEach(b => {
+    b.checked = !!saved[b.id];
+    b.addEventListener('change', () => {
+      saved[b.id] = b.checked;
+      try { localStorage.setItem(KEY, JSON.stringify(saved)); } catch (e) {}
+      refresh();
+    });
+  });
+  refresh();
+})();
+</script>
