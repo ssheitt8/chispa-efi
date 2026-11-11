@@ -261,6 +261,17 @@ input[type="range"]::-moz-range-thumb{width:18px;height:18px;border-radius:50%;b
 .thumb b{color:var(--fg);font:600 13px var(--font-display)}
 .thumb canvas{width:100%;max-width:100%;aspect-ratio:1;height:auto;border-radius:6px;display:block;background:var(--surface-2)}
 .wiz-confirm{display:flex;flex-direction:column;gap:10px}
+.maps-head{margin-top:20px}
+.maps-src{display:flex;flex-direction:column;gap:0}
+.maps-block{display:flex;flex-direction:column;gap:10px;padding-block:16px;border-top:1px solid var(--line)}
+.maps-block:first-child{border-top:0;padding-top:0}
+.maps-block:last-child{padding-bottom:0}
+.lib{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:8px}
+.lib li{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:4px 12px;align-items:center;background:var(--surface-2);border:1px solid var(--line);border-radius:10px;padding:10px 12px}
+.lib li b{font-weight:600;font-size:14px}
+.lib li small{grid-column:1;color:var(--muted);font:500 12px var(--font-mono)}
+.lib li .btn{grid-row:1 / span 2;grid-column:2;min-height:34px;padding:6px 12px}
+.lib .lib-make{background:none;border:0;padding:6px 0 0;font:600 11px var(--font-mono);letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
 
 /* ---------- datalog ---------- */
 .log-actions{display:flex;gap:8px;flex-wrap:wrap}
@@ -426,6 +437,50 @@ input[type="range"]::-moz-range-thumb{width:18px;height:18px;border-radius:50%;b
           <div class="log-actions"><button class="btn primary" id="wizYes" type="button">Reemplazar</button><button class="btn ghost" id="wizNo" type="button">Cancelar</button></div>
         </div>
         <p class="sim-note" id="wizMsg">Es un punto de partida conservador, rico a plena carga y con poco avance. No reemplaza la afinación con wideband.</p>
+      </div>
+    </div>
+
+    <div class="tv-head maps-head"><div><h2>Mapas guardados</h2><p>Abrí un mapa de TunerStudio (.msq), probá uno de la biblioteca de Speeduino o guardá el que tiene la ECU para armar tu propia biblioteca.</p></div></div>
+    <div class="wiz">
+      <div class="card maps-src">
+        <div class="maps-block">
+          <h3>Abrir un archivo</h3>
+          <p class="sim-note">Carga las tablas VE, de avance y de AFR objetivo, el inyector base, el tiempo muerto y el estequiométrico. El resto de la configuración (rueda fónica, sensores, salidas) no se toca.</p>
+          <div class="log-actions"><button class="btn" id="msqOpen" type="button">Abrir archivo .msq</button></div>
+          <input type="file" id="msqFile" accept=".msq,.xml,application/xml,text/xml" hidden>
+        </div>
+        <div class="maps-block">
+          <h3>Guardar el mapa de la ECU</h3>
+          <label class="fld" for="msqName">Nombre o notas del mapa<span class="in"><input id="msqName" type="text" maxlength="120" placeholder="Toyota 4K carburado, inyectores 240 cc" style="font-family:var(--font-body)"></span></label>
+          <div class="log-actions"><button class="btn" id="msqExport" type="button" disabled>Guardar como .msq</button></div>
+          <p class="sim-note" id="msqExportNote">Guarda las tres tablas con sus ejes, el inyector base, el tiempo muerto, el estequiométrico, los cilindros y la carga. Así lo podés volver a abrir en Chispa.</p>
+        </div>
+        <div class="maps-block">
+          <h3>Biblioteca de Speeduino</h3>
+          <p class="sim-note">Mapas oficiales y de usuarios de <a href="https://github.com/speeduino/Tunes" target="_blank" rel="noopener" style="color:var(--accent)">github.com/speeduino/Tunes</a>. Tienen licencia CC BY-NC 4.0: sirven para probar y aprender, pero no se pueden incluir en un producto que vendas.</p>
+          <div class="log-actions"><button class="btn" id="libLoad" type="button">Ver la biblioteca</button></div>
+          <ul class="lib" id="libList"></ul>
+        </div>
+      </div>
+      <div class="card wiz-res" aria-live="polite">
+        <h3 id="msqTitle">Ningún mapa abierto</h3>
+        <p class="sim-note" id="msqMeta">Abrí un archivo o elegí uno de la biblioteca para ver qué trae antes de cargarlo en la ECU.</p>
+        <dl class="info" id="msqOut"></dl>
+        <ul class="wiz-warn" id="msqWarn"></ul>
+        <div class="thumbs" id="msqThumbs" hidden>
+          <div class="thumb"><b>Tabla VE</b><canvas id="tm-ve" width="160" height="160"></canvas><span id="tm-ve-r"></span></div>
+          <div class="thumb"><b>Avance</b><canvas id="tm-ign" width="160" height="160"></canvas><span id="tm-ign-r"></span></div>
+          <div class="thumb"><b>AFR objetivo</b><canvas id="tm-afr" width="160" height="160"></canvas><span id="tm-afr-r"></span></div>
+        </div>
+        <div class="log-actions">
+          <button class="btn primary" id="msqApply" type="button" disabled>Cargar en la ECU</button>
+          <button class="btn ghost" id="msqRestore" type="button" hidden>Volver al mapa anterior</button>
+        </div>
+        <div class="note wiz-confirm" id="msqConfirm" hidden>
+          <span id="msqConfirmText">Esto reemplaza en la ECU las tablas del mapa abierto, con sus ejes, y el inyector base. Hasta que toques Quemar podés volver al mapa anterior.</span>
+          <div class="log-actions"><button class="btn primary" id="msqYes" type="button">Reemplazar</button><button class="btn ghost" id="msqNo" type="button">Cancelar</button></div>
+        </div>
+        <p class="sim-note" id="msqMsg"></p>
       </div>
     </div>
   </section>
@@ -1849,8 +1904,9 @@ function wizUpdate() {
   const apply = $('#wizApply');
   apply.disabled = !App.client || r.errs.length > 0;
   apply.title = !App.client ? 'Conectá una ECU para aplicar' : '';
-  $('#wizRestore').hidden = !App.wizBackup || !App.client;
+  updateRestore();
   $('#wizVirtual').hidden = App.mode !== 'virtual';
+  msqUpdate();
 }
 function wizPage(vals, xb, yb, translate) {
   const b = new Uint8Array(288);
@@ -1858,21 +1914,35 @@ function wizPage(vals, xb, yb, translate) {
   for (let i = 0; i < 16; i++) { b[256 + i] = Math.round(xb[i] / 100); b[272 + i] = Math.round(yb[i] / 2); }
   return b;
 }
+// m = { b24, b27, b50 (bytes de la página 1, opcionales), ve/ign/afr: { bytes (288), scale, unit } (opcionales) }
 async function writeBaseMap(m) {
-  const c = App.client;
-  await c.writePage(1, 24, [m.b24]); await c.writePage(1, 27, [m.b27]); await c.writePage(1, 50, [m.b50]);
-  const p1 = App.info.p1; p1[24] = m.b24; p1[27] = m.b27; p1[50] = m.b50;
-  App.info.reqFuel = m.b24 / 10; App.info.injOpen = m.b27 / 10; App.info.stoich = m.b50 / 10;
-  for (const [key, bytes] of [['ve', m.p2], ['ign', m.p3], ['afr', m.p5]]) {
-    const T = App.tables[key];
-    await c.writePage(T.page, 0, Array.from(bytes));
-    const burned = T.burned.slice();
-    T.loadPage(bytes, 2, 'kPa'); T.burned.set(burned);
-    App.undo[key] = []; App.extraBurn.add(T.page); App.views[key].refresh(true);
+  const c = App.client, p1 = App.info.p1, pages = [];
+  for (const [off, val] of [[24, m.b24], [27, m.b27], [50, m.b50]]) {
+    if (val == null) continue;
+    await c.writePage(1, off, [val]); p1[off] = val; App.extraBurn.add(1);
   }
-  App.extraBurn.add(1);
-  log(`Mapa base escrito: reqFuel ${(m.b24 / 10).toFixed(1)} ms, tiempo muerto ${(m.b27 / 10).toFixed(1)} ms, páginas 2, 3 y 5`, 'ok');
+  App.info.reqFuel = p1[24] / 10; App.info.injOpen = p1[27] / 10; App.info.stoich = p1[50] / 10;
+  for (const key of TABLE_KEYS) {
+    const pg = m[key];
+    if (!pg) continue;
+    const T = App.tables[key];
+    await c.writePage(T.page, 0, Array.from(pg.bytes));
+    const burned = T.burned.slice();
+    T.loadPage(pg.bytes, pg.scale, pg.unit); T.burned.set(burned);
+    App.undo[key] = []; App.extraBurn.add(T.page); App.views[key].refresh(true);
+    pages.push(T.page);
+  }
+  log(`Mapa escrito: reqFuel ${App.info.reqFuel.toFixed(1)} ms, tiempo muerto ${App.info.injOpen.toFixed(1)} ms, páginas ${pages.join(', ') || 'ninguna'}`, 'ok');
   renderInfo(); updateBurnUI();
+}
+// Copia del mapa que tiene la ECU ahora, para poder volver atrás
+function snapshotMap() {
+  const T = App.tables, p1 = App.info.p1, pg = k => ({ bytes: T[k].toPage(), scale: T[k].loadScale, unit: T[k].loadUnit });
+  return { b24: p1[24], b27: p1[27], b50: p1[50], ve: pg('ve'), ign: pg('ign'), afr: pg('afr') };
+}
+function updateRestore() {
+  const show = !!App.wizBackup && !!App.client;
+  ['#wizRestore', '#msqRestore'].forEach(s => { const b = $(s); if (b) b.hidden = !show; });
 }
 async function wizApply() {
   const r = wizRes, msg = $('#wizMsg');
@@ -1881,10 +1951,9 @@ async function wizApply() {
   const btn = $('#wizApply'); btn.disabled = true; msg.textContent = 'Escribiendo en la ECU…';
   try {
     while (pendingWrites() || App.flushing) { await flushWrites(); await sleep(20); }
-    const T = App.tables, p1 = App.info.p1;
-    const backup = { b24: p1[24], b27: p1[27], b50: p1[50], p2: T.ve.toPage(), p3: T.ign.toPage(), p5: T.afr.toPage() };
+    const backup = snapshotMap(), kpa = bytes => ({ bytes, scale: 2, unit: 'kPa' });
     await writeBaseMap({ b24: Math.round(r.reqFuel * 10), b27: Math.round(r.w.dead * 10), b50: Math.round(r.fuel.stoich * 10),
-      p2: wizPage(r.ve, r.xb, r.yb, 0), p3: wizPage(r.ign, r.xb, r.yb, -40), p5: wizPage(r.afr, r.xb, r.yb, 0) });
+      ve: kpa(wizPage(r.ve, r.xb, r.yb, 0)), ign: kpa(wizPage(r.ign, r.xb, r.yb, -40)), afr: kpa(wizPage(r.afr, r.xb, r.yb, 0)) });
     App.wizBackup = backup;
     msg.textContent = App.mode === 'virtual'
       ? 'Listo: el mapa base ya está andando en la ECU virtual. Revisalo en Inyección y Encendido, y tocá Quemar para guardarlo.'
@@ -1921,6 +1990,252 @@ function wizInit() {
   $('#wizRestore').addEventListener('click', wizRestore);
   $('#wizVirtual').addEventListener('click', () => { wizFill(WIZ_DEFAULT); wizUpdate(); });
   wizUpdate();
+}
+
+/* ============================== mapas .msq (TunerStudio) ============================== */
+const LOAD_NAMES = ['MAP', 'TPS', 'IMAP/EMAP'];
+const LIB_RAW = 'https://raw.githubusercontent.com/speeduino/Tunes/main/';
+let msqMap = null;          // mapa abierto, todavía sin cargar en la ECU
+let msqExportText = '';
+
+function decodeXmlBytes(buf) {
+  const head = new TextDecoder('ascii').decode(new Uint8Array(buf.slice(0, 200)));
+  const m = /encoding=["']([\w-]+)["']/i.exec(head);
+  try { return new TextDecoder(m ? m[1].toLowerCase() : 'utf-8').decode(buf); }
+  catch (e) { return new TextDecoder('utf-8').decode(buf); }
+}
+// Lee un .msq. Las tablas vienen fila por fila desde la carga más baja, con los valores en unidades reales.
+function parseMsq(text) {
+  const doc = new DOMParser().parseFromString(text, 'application/xml');
+  if (doc.getElementsByTagName('parsererror').length) throw new Error('El archivo no es un .msq válido: el XML tiene errores.');
+  if (doc.documentElement.localName !== 'msq') throw new Error('El archivo no es un mapa de TunerStudio (.msq).');
+  const C = {};
+  for (const c of doc.getElementsByTagNameNS('*', 'constant')) C[c.getAttribute('name')] = c;
+  const nums = n => C[n] ? C[n].textContent.trim().split(/\s+/).filter(Boolean).map(Number) : null;
+  const num = n => { const a = nums(n); return a && a.length && isFinite(a[0]) ? a[0] : null; };
+  const str = n => C[n] ? C[n].textContent.trim().replace(/^"|"$/g, '') : null;
+  const table = (v, x, y, name) => {
+    const vals = nums(v), xb = nums(x), yb = nums(y);
+    if (!vals || !xb || !yb) return null;
+    if (vals.length !== 256 || xb.length !== 16 || yb.length !== 16 || vals.concat(xb, yb).some(n => !isFinite(n)))
+      throw new Error(`La tabla ${name} del archivo no tiene el formato 16 × 16 de Speeduino.`);
+    return { vals, xb, yb };
+  };
+  const stoich = num('stoich');
+  const ve = table('veTable', 'rpmBins', 'fuelLoadBins', 'VE');
+  const ign = table('advTable1', 'rpmBins2', 'mapBins1', 'de avance');
+  let afr = table('afrTable', 'rpmBinsAFR', 'loadBinsAFR', 'de AFR objetivo');
+  if (!afr && stoich) { const lam = table('lambdaTable', 'rpmBinsAFR', 'loadBinsAFR', 'de lambda'); if (lam) afr = { vals: lam.vals.map(l => l * stoich), xb: lam.xb, yb: lam.yb }; }
+  if (!ve && !ign && !afr) throw new Error('El archivo no trae ninguna de las tablas que Chispa sabe cargar (VE, avance o AFR objetivo).');
+  const vi = doc.getElementsByTagNameNS('*', 'versionInfo')[0], bib = doc.getElementsByTagNameNS('*', 'bibliography')[0];
+  const int = s => s && /^\d+$/.test(s) ? +s : null, inc = str('incorporateAFR');
+  return {
+    signature: vi ? vi.getAttribute('signature') : null,
+    author: bib ? bib.getAttribute('author') : null, date: bib ? bib.getAttribute('writeDate') : null, comment: bib ? bib.getAttribute('tuneComment') : null,
+    cyl: int(str('nCylinders')), nInj: int(str('nInjectors')), alg: str('algorithm'), ignAlg: str('ignAlgorithm'), incAfr: inc == null ? null : inc === 'Yes',
+    reqFuel: num('reqFuel'), injOpen: num('injOpen'), stoich,
+    trig: str('TrigPattern'), teeth: num('numTeeth'), missing: num('missingTeeth'), layout: str('injLayout'), spark: str('sparkMode'),
+    ve, ign, afr
+  };
+}
+const loadScaleOf = alg => alg === 'TPS' ? 0.5 : 2;
+const loadUnitOf = alg => alg === 'TPS' ? '%' : 'kPa';
+function msqPage(t, translate, mult, loadScale) {
+  const b = new Uint8Array(288);
+  for (let i = 0; i < 256; i++) b[i] = clamp(Math.round(t.vals[i] * mult) - translate, 0, 255);
+  for (let i = 0; i < 16; i++) { b[256 + i] = clamp(Math.round(t.xb[i] / 100), 0, 255); b[272 + i] = clamp(Math.round(t.yb[i] / loadScale), 0, 255); }
+  return b;
+}
+function msqCheck(m) {
+  const errs = [], warns = [], ecu = App.client ? App.info : null, ver = s => (/\d{6}/.exec(s || '') || [''])[0];
+  if (ecu) {
+    if (m.cyl && typeof ecu.cyl === 'number' && m.cyl !== ecu.cyl) errs.push(`El mapa es para ${m.cyl} cilindros y la ECU está configurada con ${ecu.cyl}.`);
+    if ((m.ve || m.afr) && m.alg && m.alg !== LOAD_NAMES[ecu.alg]) errs.push(`El mapa usa ${m.alg} como carga de combustible y la ECU usa ${LOAD_NAMES[ecu.alg] || 'otra'}. Cambialo en TunerStudio (Engine Constants) antes de cargarlo.`);
+    if (m.ign && m.ignAlg && m.ignAlg !== LOAD_NAMES[ecu.ignAlg]) errs.push(`El avance del mapa usa ${m.ignAlg} como carga y la ECU usa ${LOAD_NAMES[ecu.ignAlg] || 'otra'}.`);
+    if (m.nInj && ecu.nInj && m.nInj !== ecu.nInj) warns.push(['warn', `El mapa es para ${m.nInj} inyectores y la ECU tiene ${ecu.nInj}: revisá el inyector base.`]);
+    if (m.incAfr != null && m.incAfr !== ecu.incAfr) warns.push(['warn', `El mapa se hizo con "Incorporate AFR" ${m.incAfr ? 'prendido' : 'apagado'} y la ECU lo tiene ${ecu.incAfr ? 'prendido' : 'apagado'}: la misma tabla VE va a dar otra mezcla.`]);
+    if (m.signature && ecu.sig && ver(m.signature) && ver(m.signature) !== ver(ecu.sig)) warns.push(['ok', `El mapa es de "${m.signature}" y la ECU tiene "${ecu.sig}". Estas tablas no cambiaron entre versiones.`]);
+  }
+  if (!m.ve) warns.push(['warn', 'El archivo no trae tabla VE: queda la de la ECU.']);
+  if (!m.ign) warns.push(['warn', 'El archivo no trae tabla de avance: queda la de la ECU.']);
+  if (!m.afr) warns.push(['warn', 'El archivo no trae tabla de AFR objetivo: queda la de la ECU.']);
+  if (m.reqFuel == null) warns.push(['warn', 'El archivo no trae inyector base: queda el de la ECU.']);
+  if (m.trig) warns.push(['ok', `Se hizo con la rueda "${m.trig}${m.trig === 'Missing Tooth' && m.teeth ? ` ${m.teeth}-${m.missing ?? 0}` : ''}". Chispa no cambia la rueda ni los sensores: si son distintos a los tuyos, configuralos en TunerStudio.`]);
+  warns.push(['ok', 'Aunque el motor sea el mismo, revisá la mezcla con wideband antes de exigirlo: otros inyectores, sensores o escape cambian todo.']);
+  return { errs, warns };
+}
+function msqDrawThumbs(m) {
+  const box = $('#msqThumbs'); box.hidden = false;
+  const draw = (key, t, fmt) => {
+    const cv = $('#tm-' + key), lbl = $('#tm-' + key + '-r');
+    if (!t) { cv.getContext('2d').clearRect(0, 0, cv.width, cv.height); lbl.textContent = 'no viene'; return; }
+    const [a, b] = drawThumb(cv, t.vals); lbl.textContent = fmt(a, b);
+  };
+  draw('ve', m.ve, (a, b) => `${Math.round(a)}–${Math.round(b)} %`);
+  draw('ign', m.ign, (a, b) => `${Math.round(a)}–${Math.round(b)}°`);
+  draw('afr', m.afr, (a, b) => `${a.toFixed(1)}–${b.toFixed(1)}`);
+}
+function msqShow(m, origen) {
+  msqMap = m;
+  $('#msqTitle').textContent = m.comment || origen;
+  $('#msqMeta').textContent = [m.comment ? origen : null, m.signature ? `firmware ${m.signature}` : null, m.date].filter(Boolean).join(' · ');
+  const f1 = v => v == null ? '—' : v.toFixed(1);
+  const rows = [['Cilindros · inyectores', `${m.cyl ?? '—'} · ${m.nInj ?? '—'}`], ['Carga', m.alg || '—'], ['Inyector base', m.reqFuel == null ? '—' : f1(m.reqFuel) + ' ms'],
+    ['Tiempo muerto', m.injOpen == null ? '—' : f1(m.injOpen) + ' ms'], ['Estequiométrico', m.stoich == null ? '—' : f1(m.stoich) + ' : 1'],
+    ['Inyección · chispa', [m.layout, m.spark].filter(Boolean).join(' · ') || '—']];
+  $('#msqOut').innerHTML = rows.map(([k, v]) => `<div><dt>${esc(k)}</dt><dd>${esc(v)}</dd></div>`).join('');
+  $('#msqMsg').textContent = '';
+  $('#msqConfirm').hidden = true;
+  msqUpdate();
+}
+function msqError(text) {
+  msqMap = null;
+  $('#msqTitle').textContent = 'No se pudo abrir el mapa';
+  $('#msqMeta').textContent = text;
+  $('#msqOut').innerHTML = ''; $('#msqWarn').innerHTML = ''; $('#msqThumbs').hidden = true;
+  msqUpdate();
+}
+function msqUpdate() {
+  if (!$('#msqApply')) return;
+  if (!msqExportText) msqExportText = $('#msqExportNote').textContent;
+  $('#msqExport').disabled = !App.client || inFrame;
+  $('#msqExportNote').textContent = inFrame ? 'Guardar archivos no anda dentro de esta vista. Abrí Chispa desde https://ssheitt8.github.io/chispa-efi/ para usarlo.' : msqExportText;
+  const apply = $('#msqApply');
+  if (!msqMap) { apply.disabled = true; updateRestore(); return; }
+  const { errs, warns } = msqCheck(msqMap);
+  $('#msqWarn').innerHTML = errs.map(e => ['bad', e]).concat(warns).map(([k, t]) => `<li data-kind="${k}">${esc(t)}</li>`).join('');
+  msqDrawThumbs(msqMap);
+  apply.disabled = !App.client || errs.length > 0;
+  apply.title = !App.client ? 'Conectá una ECU para cargar el mapa' : '';
+  updateRestore();
+}
+async function msqApply() {
+  const m = msqMap, msg = $('#msqMsg');
+  $('#msqConfirm').hidden = true;
+  if (!App.client || !m || msqCheck(m).errs.length) return;
+  $('#msqApply').disabled = true; msg.textContent = 'Escribiendo en la ECU…';
+  try {
+    while (pendingWrites() || App.flushing) { await flushWrites(); await sleep(20); }
+    const backup = snapshotMap(), T = App.tables;
+    const fs = m.alg ? loadScaleOf(m.alg) : T.ve.loadScale, fu = m.alg ? loadUnitOf(m.alg) : T.ve.loadUnit;
+    const is = m.ignAlg ? loadScaleOf(m.ignAlg) : T.ign.loadScale, iu = m.ignAlg ? loadUnitOf(m.ignAlg) : T.ign.loadUnit;
+    const b = (v, k) => v == null ? null : clamp(Math.round(v * 10), k, 255);
+    await writeBaseMap({
+      b24: b(m.reqFuel, 1), b27: b(m.injOpen, 0), b50: b(m.stoich, 1),
+      ve: m.ve ? { bytes: msqPage(m.ve, 0, 1, fs), scale: fs, unit: fu } : null,
+      ign: m.ign ? { bytes: msqPage(m.ign, -40, 1, is), scale: is, unit: iu } : null,
+      afr: m.afr ? { bytes: msqPage(m.afr, 0, 10, fs), scale: fs, unit: fu } : null
+    });
+    App.wizBackup = backup;
+    msg.textContent = App.mode === 'virtual'
+      ? 'Listo: el mapa ya está andando en la ECU virtual. Revisalo en Inyección y Encendido, y tocá Quemar para guardarlo.'
+      : 'Listo: el mapa está en la memoria de la ECU. Revisalo, tocá Quemar y reiniciá la ECU para que tome el inyector base y el tiempo muerto.';
+    toast('Mapa cargado. Falta quemarlo.');
+  } catch (e) {
+    msg.textContent = 'No se pudo cargar el mapa: ' + e.message + '. Reconectá la ECU para releer lo que quedó.';
+    log('Error al cargar el mapa: ' + e.message, 'err');
+  }
+  msqUpdate();
+}
+// Arma un .msq con lo que Chispa maneja: las tres tablas con sus ejes y los datos de inyección
+function buildMsq(name) {
+  const i = App.info, T = App.tables, x = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+  const v1 = v => Number(v).toFixed(1);
+  const rows = (vals, f) => { let s = '\n'; for (let r = 0; r < 16; r++) s += '            ' + Array.from(vals.slice(r * 16, r * 16 + 16), f).join(' ') + ' \n'; return s + '        '; };
+  const col = arr => '\n' + Array.from(arr, v => '            ' + v1(v) + ' \n').join('') + '        ';
+  const tbl = (n, u, d, vals, f) => `        <constant cols="16" digits="${d}" name="${n}" rows="16" units="${u}">${rows(vals, f)}</constant>\n`;
+  const bins = (n, u, arr) => `        <constant cols="1" digits="0" name="${n}" rows="16" units="${u}">${col(arr)}</constant>\n`;
+  const lu = t => t.loadUnit === '%' ? '%' : 'kPa';
+  const bits = [];
+  if (typeof i.cyl === 'number') bits.push(`        <constant name="nCylinders">"${i.cyl}"</constant>`);
+  if (i.nInj) bits.push(`        <constant name="nInjectors">"${i.nInj}"</constant>`);
+  return `<?xml version="1.0" encoding="UTF-8"?>
+<msq xmlns="http://www.msefi.com/:msq">
+    <bibliography author="Chispa EFI" tuneComment="${x(name)}" writeDate="${x(new Date().toString())}"/>
+    <versionInfo fileFormat="5.0" firmwareInfo="${x(i.sig)}" nPages="15" signature="${x(i.sig)}"/>
+    <page number="0" size="128">
+        <constant digits="1" name="reqFuel" units="ms">${v1(i.reqFuel)}</constant>
+        <constant digits="1" name="injOpen" units="ms">${v1(i.injOpen)}</constant>
+${bits.join('\n')}${bits.length ? '\n' : ''}        <constant name="algorithm">"${LOAD_NAMES[i.alg] || 'MAP'}"</constant>
+        <constant name="ignAlgorithm">"${LOAD_NAMES[i.ignAlg] || 'MAP'}"</constant>
+        <constant digits="1" name="stoich" units=":1">${v1(i.stoich)}</constant>
+        <constant name="incorporateAFR">"${i.incAfr ? 'Yes' : 'No'}"</constant>
+    </page>
+    <page number="1" size="288">
+${tbl('veTable', '%', 0, T.ve.values, v1)}${bins('rpmBins', 'RPM', T.ve.x)}${bins('fuelLoadBins', lu(T.ve), T.ve.y)}    </page>
+    <page number="2" size="288">
+${tbl('advTable1', 'deg', 0, T.ign.values, v1)}${bins('rpmBins2', 'RPM', T.ign.x)}${bins('mapBins1', lu(T.ign), T.ign.y)}    </page>
+    <page number="4" size="288">
+${tbl('afrTable', 'AFR', 1, T.afr.values, v => (v / 10).toFixed(1))}${bins('rpmBinsAFR', 'RPM', T.afr.x)}${bins('loadBinsAFR', lu(T.afr), T.afr.y)}    </page>
+</msq>
+`;
+}
+function msqExport() {
+  if (!App.client || inFrame) return;
+  const name = $('#msqName').value.trim();
+  const slug = (name || 'mapa').normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^\w.-]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 60) || 'mapa';
+  const file = `chispa-${slug}-${new Date().toISOString().slice(0, 10)}.msq`;
+  const url = URL.createObjectURL(new Blob([buildMsq(name)], { type: 'application/xml' }));
+  const a = document.createElement('a'); a.href = url; a.download = file; a.click();
+  setTimeout(() => URL.revokeObjectURL(url), 2000);
+  log('Mapa guardado como ' + file, 'ok');
+  toast('Mapa guardado: ' + file);
+}
+async function libLoad() {
+  const list = $('#libList'), btn = $('#libLoad');
+  btn.disabled = true;
+  list.innerHTML = '<li><span class="sim-note">Buscando mapas…</span></li>';
+  try {
+    const r = await fetch(LIB_RAW + 'index.json', { cache: 'no-cache' });
+    if (!r.ok) throw new Error('el servidor respondió ' + r.status);
+    const items = await r.json(), byMake = {};
+    for (const it of items) (byMake[it.make || 'Otros'] = byMake[it.make || 'Otros'] || []).push(it);
+    list.innerHTML = Object.keys(byMake).sort().map(make => `<li class="lib-make">${esc(make)}</li>` + byMake[make].map(it => {
+      const path = `${encodeURIComponent(it.make)}/${it.filename}`;
+      const det = [it.provider, it.board, it.firmware ? 'firmware ' + it.firmware : null].filter(Boolean).join(' · ');
+      return `<li title="${esc(it.description || '')}"><b>${esc(it.displayName || it.filename)}</b><small>${esc(det)}</small><button class="btn" type="button" data-lib="${esc(path)}" data-name="${esc(it.displayName || it.filename)}">Ver</button></li>`;
+    }).join('')).join('');
+    btn.hidden = true;
+  } catch (e) {
+    list.innerHTML = `<li><span class="sim-note">${inFrame
+      ? 'Dentro de esta vista el navegador no deja bajar archivos de otros sitios. Abrí Chispa desde https://ssheitt8.github.io/chispa-efi/ para usar la biblioteca.'
+      : 'No se pudo bajar la biblioteca (' + esc(e.message) + '). Revisá la conexión a internet.'}</span></li>`;
+    btn.disabled = false;
+  }
+}
+async function libOpen(path, name) {
+  $('#msqTitle').textContent = 'Bajando ' + name + '…';
+  try {
+    const r = await fetch(LIB_RAW + path);
+    if (!r.ok) throw new Error('el servidor respondió ' + r.status);
+    msqShow(parseMsq(decodeXmlBytes(await r.arrayBuffer())), 'Biblioteca de Speeduino · ' + name);
+  } catch (e) { msqError('No se pudo bajar "' + name + '": ' + e.message); }
+}
+function msqInit() {
+  msqExportText = $('#msqExportNote').textContent;
+  $('#msqOpen').addEventListener('click', () => $('#msqFile').click());
+  $('#msqFile').addEventListener('change', async e => {
+    const f = e.target.files && e.target.files[0];
+    if (!f) return;
+    try { msqShow(parseMsq(decodeXmlBytes(await f.arrayBuffer())), f.name); }
+    catch (err) { msqError(err.message); }
+    e.target.value = '';
+  });
+  $('#msqExport').addEventListener('click', msqExport);
+  $('#libLoad').addEventListener('click', libLoad);
+  $('#libList').addEventListener('click', e => { const b = e.target.closest('[data-lib]'); if (b) libOpen(b.dataset.lib, b.dataset.name); });
+  $('#msqApply').addEventListener('click', () => {
+    const m = msqMap; if (!m) return;
+    const parts = [m.ve && 'la tabla VE', m.ign && 'la de avance', m.afr && 'la de AFR objetivo'].filter(Boolean);
+    const extra = [m.reqFuel != null && 'el inyector base', m.injOpen != null && 'el tiempo muerto', m.stoich != null && 'el estequiométrico'].filter(Boolean);
+    $('#msqConfirmText').textContent = `Esto reemplaza en la ECU ${parts.join(', ')} (con sus ejes)${extra.length ? ' y ' + extra.join(', ') : ''}. Hasta que toques Quemar podés volver al mapa anterior.`;
+    $('#msqConfirm').hidden = false; $('#msqYes').focus();
+  });
+  $('#msqNo').addEventListener('click', () => { $('#msqConfirm').hidden = true; });
+  $('#msqYes').addEventListener('click', msqApply);
+  $('#msqRestore').addEventListener('click', async () => { await wizRestore(); $('#msqMsg').textContent = $('#wizMsg').textContent; msqUpdate(); });
+  if (location.hostname === 'localhost') window.__chispa = { parseMsq, buildMsq };   // solo para probar en local
+  msqUpdate();
 }
 
 /* ============================== registro de datos ============================== */
@@ -2024,6 +2339,7 @@ function init() {
     const fv = App.views[App.fuelView]; fv.cw = 0; fv.refresh(); placeSim(); renderLive();
   }));
   wizInit();
+  msqInit();
   renderInfo(); renderLog();
 
   $$('.tab').forEach(t => t.addEventListener('click', () => { if (location.hash !== '#' + t.dataset.view) location.hash = t.dataset.view; else show(t.dataset.view); }));

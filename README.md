@@ -60,6 +60,27 @@ Antes de escribir guarda una copia del mapa anterior, y el botón **Volver al ma
 
 La ECU virtual ahora usa `reqFuel`, `injOpen` y la tabla de AFR objetivo de su página 1 y su página 5, igual que Speeduino. Su motor "real" tiene 1600 cc, 4 cilindros e inyectores de 315 cc/min a 3 bar. Con esos datos el asistente da 8.5 ms, el mismo valor de fábrica.
 
+## Mapas guardados (.msq de TunerStudio)
+
+Esta sección está en la pestaña Motor.
+
+- **Abrir un archivo `.msq`:**
+  - Lee `veTable`, `advTable1` y `afrTable` (si no está, usa `lambdaTable` × estequiométrico), cada una con sus ejes.
+  - También lee `reqFuel`, `injOpen` y `stoich`.
+  - Para comparar con la ECU conectada lee además los cilindros, los inyectores, la carga, "Incorporate AFR" y la rueda.
+  - Bloquea la carga si no coinciden los cilindros o la carga (MAP/TPS). Avisa por el resto.
+  - En el `.msq` las tablas vienen fila por fila desde la carga más baja, con valores en unidades reales. Las páginas se numeran desde 0: la página "1" del archivo es la página 2 de Speeduino.
+  - No toca la rueda fónica, los sensores ni las salidas.
+- **Guardar el mapa de la ECU:** genera un `.msq` con las tres tablas, sus ejes, el inyector base, el tiempo muerto, el estequiométrico, los cilindros, los inyectores, la carga e "Incorporate AFR", y las notas que escribas.
+  - Está pensado para volver a abrirlo en Chispa y armar la biblioteca propia.
+  - TunerStudio debería poder leer las tablas, pero no está probado.
+  - En la vista de Artifact no se pueden guardar archivos: hay que usar la app publicada.
+- **Biblioteca de Speeduino:** baja `index.json` y los mapas de `github.com/speeduino/Tunes`, rama `main`.
+  - **Licencia CC BY-NC 4.0, sin uso comercial:** sirven para probar y aprender, pero no se pueden incluir en un producto que se venda.
+  - Solo anda desde la dirección publicada o desde localhost, porque la vista de Artifact bloquea las descargas de otros sitios.
+
+Cargar un mapa usa la misma copia de respaldo que el asistente: "Volver al mapa anterior" repone las tablas, los ejes y los datos de inyección que había.
+
 ## Puente Bluetooth (ESP32)
 
 - Pasa el **segundo serial de Speeduino** a Bluetooth LE con el servicio Nordic UART. En el Mega es Serial3: TX3 = D14 y RX3 = D15.
